@@ -10,51 +10,48 @@
  *  Revised:  		-
  *  Compiler:  		gcc
  *
- *  Authors:  		Devarun Bhattacharya, 
+ *  Authors:  		Devarun Bhattacharya,
  * 					Mohammad Mushfiqur Rahman
- * 
- * 	Intructions:	Please address all the "TODO"s in the code below and modify 
- * 					them accordingly. No need to modify anything else, unless you 
- * 					find a bug in the tester! Don't modify the tester to circumvent 
+ *
+ * 	Intructions:	Please address all the "TODO"s in the code below and modify
+ * 					them accordingly. No need to modify anything else, unless you
+ * 					find a bug in the tester! Don't modify the tester to circumvent
  * 					the bug in your code!
  * =====================================================================================
  */
 
-/* Includes */
+ /* Includes */
 #include <unistd.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include "sma.h"
 
-int main(int argc, char *argv[])
-{
+int main(int argc, char* argv[]) {
 	int i, count = 0;
-	void *ptr, *limitafter = NULL, *limitbefore = NULL;
-	char *c[32], *ct;
-	int *c2[32];
+	void* ptr, * limitafter = NULL, * limitbefore = NULL;
+	char* c[32], * ct;
+	int* c2[32];
 	char str[60];
 
 	// Test 1: Find the holes
 	puts("Test 1: Excess Memory Allocation...");
 
 	// Allocating 32 kbytes of memory..
-	for (i = 0; i < 32; i++)
-	{
-		c[i] = (char *)sma_malloc(1024);
+	for (i = 0; i < 32; i++) 	{
+		c[i] = (char*)sma_malloc(1024);
 		// sprintf(str, "c[i]: %p", c[i]);
 		// puts(str);
 	}
 
 	// Now deallocating some of the slots ..to free
-	for (i = 10; i < 18; i++)
-	{
+	for (i = 10; i < 18; i++) 	{
 		sma_free(c[i]);
 		// sprintf(str, "Freeing c[i]: %p", c[i]);
 		// puts(str);
 	}
 
 	// Allocate some storage .. this should go into the freed storage
-	ct = (char *)sma_malloc(5 * 1024);
+	ct = (char*)sma_malloc(5 * 1024);
 	// sprintf(str, "CT : %p", ct);
 	// puts(str);
 
@@ -68,8 +65,7 @@ int main(int argc, char *argv[])
 	puts("Test 2: Program break expansion test...");
 
 	count = 0;
-	for (i = 1; i < 40; i++)
-	{
+	for (i = 1; i < 40; i++) 	{
 		limitbefore = sbrk(0);
 		ptr = sma_malloc(1024 * 32 * i);
 		limitafter = sbrk(0);
@@ -91,7 +87,7 @@ int main(int argc, char *argv[])
 
 	// Allocating 512 kbytes of memory..
 	for (i = 0; i < 32; i++)
-		c2[i] = (int *)sma_malloc(16 * 1024);
+		c2[i] = (int*)sma_malloc(16 * 1024);
 
 	// Now deallocating some of the slots ..to free
 	// One chunk of 5x16 kbytes
@@ -119,18 +115,16 @@ int main(int argc, char *argv[])
 	sma_free(c2[5]);
 	sma_free(c2[4]);
 
-	int *cp2 = (int *)sma_malloc(16 * 1024 * 2);
+	int* cp2 = (int*)sma_malloc(16 * 1024 * 2);
 
 	// Testing if the correct hole has been allocated
-	if (cp2 != NULL)
-	{
+	if (cp2 != NULL) 	{
 		if (cp2 == c2[27] || cp2 == c2[28] || cp2 == c2[29] || cp2 == c2[30])
 			puts("\t\t\t\t PASSED\n");
 		else
 			puts("\t\t\t\t FAILED\n");
 	}
-	else
-	{
+	else 	{
 		puts("\t\t\t\t FAILED\n");
 	}
 
@@ -142,53 +136,47 @@ int main(int argc, char *argv[])
 	// Sets Policy to Next Fit
 	sma_mallopt(NEXT_FIT);
 
-	int *cp3 = (int *)sma_malloc(16 * 1024 * 3);
-	int *cp4 = (int *)sma_malloc(16 * 1024 * 2);
+	int* cp3 = (int*)sma_malloc(16 * 1024 * 3);
+	int* cp4 = (int*)sma_malloc(16 * 1024 * 2);
 
 	// Testing if the correct holes have been allocated
-	if (cp3 == c2[8] && cp3 != NULL)
-	{
-		if (cp4 == c2[19])
-		{
+	if (cp3 == c2[8] && cp3 != NULL) 	{
+		if (cp4 == c2[19]) 		{
 			// sprintf(str, "C[19]: %p", c[19]);
 			// puts(str);
 			// sprintf(str, "CP4: %p", cp4);
 			// puts(str);
 			puts("\t\t\t\t PASSED\n");
 		}
-		else
-		{
+		else 		{
 			puts("\t\t\t\t FAILED\n");
 		}
 	}
-	else
-	{
+	else 	{
 		puts("\t\t\t\t FAILED\n");
 	}
 
 	// Test 5: Realloc test (with Next Fit)
 	puts("Test 5: Check for Reallocation with Next Fit...");
 	// Writes some value pointed by the pointer
-	if(cp3 != NULL && cp4 != NULL) {
+	if (cp3 != NULL && cp4 != NULL) {
 		*cp3 = 427;
 		*cp4 = 310;
 	}
 	// Calling realloc
-	cp3 = (int *)sma_realloc(cp3, 16 * 1024 * 5);
-	cp4 = (int *)sma_realloc(cp4, 16 * 1024 * 3);
+	cp3 = (int*)sma_realloc(cp3, 16 * 1024 * 5);
+	cp4 = (int*)sma_realloc(cp4, 16 * 1024 * 3);
 
-	if (cp3 == c2[27] && cp3 != NULL && cp4 == c2[8] && cp4 != NULL)
-	{
+	if (cp3 == c2[27] && cp3 != NULL && cp4 == c2[8] && cp4 != NULL) 	{
 		//	Test the Data stored in the memory blocks
 		if (*cp3 == 427 && *cp4 == 310) {
 			puts("\t\t\t\t PASSED\n");
 		}
 		else {
 			puts("\t\t\t\t FAILED\n");
-		}				
+		}
 	}
-	else
-	{
+	else 	{
 		puts("\t\t\t\t FAILED\n");
 	}
 

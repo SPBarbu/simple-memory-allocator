@@ -11,15 +11,15 @@
  *  Compiler:  		gcc
  *
  *  Author:  		Mohammad Mushfiqur Rahman
- *      
- *  Instructions:   Please address all the "TODO"s in the code below and modify 
+ *
+ *  Instructions:   Please address all the "TODO"s in the code below and modify
  * 					them accordingly. Feel free to modify the "PRIVATE" functions.
  * 					Don't modify the "PUBLIC" functions (except the TODO part), unless
  * 					you find a bug! Refer to the Assignment Handout for further info.
  * =====================================================================================
  */
 
-/* Includes */
+ /* Includes */
 #include "sma.h" // Please add any libraries you plan to use inside this file
 
 /* Definitions*/
@@ -34,9 +34,9 @@ typedef enum //	Policy type definition
 	NEXT
 } Policy;
 
-char *sma_malloc_error;
-void *freeListHead = NULL;			  //	The pointer to the HEAD of the doubly linked free memory list
-void *freeListTail = NULL;			  //	The pointer to the TAIL of the doubly linked free memory list
+char* sma_malloc_error;
+void* freeListHead = NULL;			  //	The pointer to the HEAD of the doubly linked free memory list
+void* freeListTail = NULL;			  //	The pointer to the TAIL of the doubly linked free memory list
 unsigned long totalAllocatedSize = 0; //	Total Allocated memory in Bytes
 unsigned long totalFreeSize = 0;	  //	Total Free memory in Bytes in the free memory list
 Policy currentPolicy = WORST;		  //	Current Policy
@@ -48,40 +48,35 @@ Policy currentPolicy = WORST;		  //	Current Policy
  * =====================================================================================
  */
 
-/*
- *	Funcation Name: sma_malloc
- *	Input type:		int
- * 	Output type:	void*
- * 	Description:	Allocates a memory block of input size from the heap, and returns a 
- * 					pointer pointing to it. Returns NULL if failed and sets a global error.
- */
-void *sma_malloc(int size)
-{
-	void *pMemory = NULL;
+ /*
+  *	Funcation Name: sma_malloc
+  *	Input type:		int
+  * 	Output type:	void*
+  * 	Description:	Allocates a memory block of input size from the heap, and returns a
+  * 					pointer pointing to it. Returns NULL if failed and sets a global error.
+  */
+void* sma_malloc(int size) {
+	void* pMemory = NULL;
 
 	// Checks if the free list is empty
-	if (freeListHead == NULL)
-	{
+	if (freeListHead == NULL) {
 		// Allocate memory by increasing the Program Break
 		pMemory = allocate_pBrk(size);
 	}
 	// If free list is not empty
-	else
-	{
+	else {
 		// Allocate memory from the free memory list
 		pMemory = allocate_freeList(size);
 
 		// If a valid memory could NOT be allocated from the free memory list
-		if (pMemory == (void *)-2)
-		{
+		if (pMemory == (void*)-2) {
 			// Allocate memory by increasing the Program Break
 			pMemory = allocate_pBrk(size);
 		}
 	}
 
 	// Validates memory allocation
-	if (pMemory < 0 || pMemory == NULL)
-	{
+	if (pMemory < 0 || pMemory == NULL) {
 		sma_malloc_error = "Error: Memory allocation failed!";
 		return NULL;
 	}
@@ -98,20 +93,16 @@ void *sma_malloc(int size)
  * 	Output type:	void
  * 	Description:	Deallocates the memory block pointed by the input pointer
  */
-void sma_free(void *ptr)
-{
+void sma_free(void* ptr) {
 	//	Checks if the ptr is NULL
-	if (ptr == NULL)
-	{
+	if (ptr == NULL) {
 		puts("Error: Attempting to free NULL!");
 	}
 	//	Checks if the ptr is beyond Program Break
-	else if (ptr > sbrk(0))
-	{
+	else if (ptr > sbrk(0)) {
 		puts("Error: Attempting to free unallocated space!");
 	}
-	else
-	{
+	else {
 		//	Adds the block to the free memory list
 		add_block_freeList(ptr);
 	}
@@ -123,15 +114,12 @@ void sma_free(void *ptr)
  * 	Output type:	void
  * 	Description:	Specifies the memory allocation policy
  */
-void sma_mallopt(int policy)
-{
+void sma_mallopt(int policy) {
 	// Assigns the appropriate Policy
-	if (policy == 1)
-	{
+	if (policy == 1) {
 		currentPolicy = WORST;
 	}
-	else if (policy == 2)
-	{
+	else if (policy == 2) {
 		currentPolicy = NEXT;
 	}
 }
@@ -142,8 +130,7 @@ void sma_mallopt(int policy)
  * 	Output type:	void
  * 	Description:	Prints statistics about current memory allocation by SMA.
  */
-void sma_mallinfo()
-{
+void sma_mallinfo() {
 	//	Finds the largest Contiguous Free Space (should be the largest free block)
 	int largestFreeBlock = get_largest_freeBlock();
 	char str[60];
@@ -164,8 +151,7 @@ void sma_mallinfo()
  * 	Description:	Reallocates memory pointed to by the input pointer by resizing the
  * 					memory block according to the input size.
  */
-void *sma_realloc(void *ptr, int size)
-{
+void* sma_realloc(void* ptr, int size) {
 	// TODO: 	Should be similar to sma_malloc, except you need to check if the pointer address
 	//			had been previously allocated.
 	// Hint:	Check if you need to expand or contract the memory. If new size is smaller, then
@@ -181,15 +167,14 @@ void *sma_realloc(void *ptr, int size)
  * =====================================================================================
  */
 
-/*
- *	Funcation Name: allocate_pBrk
- *	Input type:		int
- * 	Output type:	void*
- * 	Description:	Allocates memory by increasing the Program Break
- */
-void *allocate_pBrk(int size)
-{
-	void *newBlock = NULL;
+ /*
+  *	Funcation Name: allocate_pBrk
+  *	Input type:		int
+  * 	Output type:	void*
+  * 	Description:	Allocates memory by increasing the Program Break
+  */
+void* allocate_pBrk(int size) {
+	void* newBlock = NULL;
 	int excessSize;
 
 	//	TODO: 	Allocate memory by incrementing the Program Break by calling sbrk() or brk()
@@ -208,22 +193,18 @@ void *allocate_pBrk(int size)
  * 	Output type:	void*
  * 	Description:	Allocates memory from the free memory list
  */
-void *allocate_freeList(int size)
-{
-	void *pMemory = NULL;
+void* allocate_freeList(int size) {
+	void* pMemory = NULL;
 
-	if (currentPolicy == WORST)
-	{
+	if (currentPolicy == WORST) {
 		// Allocates memory using Worst Fit Policy
 		pMemory = allocate_worst_fit(size);
 	}
-	else if (currentPolicy == NEXT)
-	{
+	else if (currentPolicy == NEXT) {
 		// Allocates memory using Next Fit Policy
 		pMemory = allocate_next_fit(size);
 	}
-	else
-	{
+	else {
 		pMemory = NULL;
 	}
 
@@ -236,9 +217,8 @@ void *allocate_freeList(int size)
  * 	Output type:	void*
  * 	Description:	Allocates memory using Worst Fit from the free memory list
  */
-void *allocate_worst_fit(int size)
-{
-	void *worstBlock = NULL;
+void* allocate_worst_fit(int size) {
+	void* worstBlock = NULL;
 	int excessSize;
 	int blockFound = 0;
 
@@ -247,15 +227,13 @@ void *allocate_worst_fit(int size)
 	//			get the largest block
 
 	//	Checks if appropriate block is found.
-	if (blockFound)
-	{
+	if (blockFound) {
 		//	Allocates the Memory Block
 		allocate_block(worstBlock, size, excessSize, 1);
 	}
-	else
-	{
+	else {
 		//	Assigns invalid address if appropriate block not found in free list
-		worstBlock = (void *)-2;
+		worstBlock = (void*)-2;
 	}
 
 	return worstBlock;
@@ -267,9 +245,8 @@ void *allocate_worst_fit(int size)
  * 	Output type:	void*
  * 	Description:	Allocates memory using Next Fit from the free memory list
  */
-void *allocate_next_fit(int size)
-{
-	void *nextBlock = NULL;
+void* allocate_next_fit(int size) {
+	void* nextBlock = NULL;
 	int excessSize;
 	int blockFound = 0;
 
@@ -280,15 +257,13 @@ void *allocate_next_fit(int size)
 	//			the smallest address)
 
 	//	Checks if appropriate found is found.
-	if (blockFound)
-	{
+	if (blockFound) {
 		//	Allocates the Memory Block
 		allocate_block(nextBlock, size, excessSize, 1);
 	}
-	else
-	{
+	else {
 		//	Assigns invalid address if appropriate block not found in free list
-		nextBlock = (void *)-2;
+		nextBlock = (void*)-2;
 	}
 
 	return nextBlock;
@@ -300,9 +275,8 @@ void *allocate_next_fit(int size)
  * 	Output type:	void
  * 	Description:	Performs routine operations for allocating a memory block
  */
-void allocate_block(void *newBlock, int size, int excessSize, int fromFreeList)
-{
-	void *excessFreeBlock; //	pointer for any excess free block
+void allocate_block(void* newBlock, int size, int excessSize, int fromFreeList) {
+	void* excessFreeBlock; //	pointer for any excess free block
 	int addFreeBlock;
 
 	// 	Checks if excess free size is big enough to be added to the free memory list
@@ -313,30 +287,25 @@ void allocate_block(void *newBlock, int size, int excessSize, int fromFreeList)
 	addFreeBlock = excessSize > FREE_BLOCK_HEADER_SIZE;
 
 	//	If excess free size is big enough
-	if (addFreeBlock)
-	{
+	if (addFreeBlock) {
 		//	TODO: Create a free block using the excess memory size, then assign it to the Excess Free Block
 
 		//	Checks if the new block was allocated from the free memory list
-		if (fromFreeList)
-		{
+		if (fromFreeList) {
 			//	Removes new block and adds the excess free block to the free list
 			replace_block_freeList(newBlock, excessFreeBlock);
 		}
-		else
-		{
+		else {
 			//	Adds excess free block to the free list
 			add_block_freeList(excessFreeBlock);
 		}
 	}
 	//	Otherwise add the excess memory to the new block
-	else
-	{
+	else {
 		//	TODO: Add excessSize to size and assign it to the new Block
 
 		//	Checks if the new block was allocated from the free memory list
-		if (fromFreeList)
-		{
+		if (fromFreeList) {
 			//	Removes the new block from the free list
 			remove_block_freeList(newBlock);
 		}
@@ -349,8 +318,7 @@ void allocate_block(void *newBlock, int size, int excessSize, int fromFreeList)
  * 	Output type:	void
  * 	Description:	Replaces old block with the new block in the free list
  */
-void replace_block_freeList(void *oldBlock, void *newBlock)
-{
+void replace_block_freeList(void* oldBlock, void* newBlock) {
 	//	TODO: Replace the old block with the new block
 
 	//	Updates SMA info
@@ -364,8 +332,7 @@ void replace_block_freeList(void *oldBlock, void *newBlock)
  * 	Output type:	void
  * 	Description:	Adds a memory block to the the free memory list
  */
-void add_block_freeList(void *block)
-{
+void add_block_freeList(void* block) {
 	//	TODO: 	Add the block to the free list
 	//	Hint: 	You could add the free block at the end of the list, but need to check if there
 	//			exits a list. You need to add the TAG to the list.
@@ -384,8 +351,7 @@ void add_block_freeList(void *block)
  * 	Output type:	void
  * 	Description:	Removes a memory block from the the free memory list
  */
-void remove_block_freeList(void *block)
-{
+void remove_block_freeList(void* block) {
 	//	TODO: 	Remove the block from the free list
 	//	Hint: 	You need to update the pointers in the free blocks before and after this block.
 	//			You also need to remove any TAG in the free block.
@@ -401,16 +367,15 @@ void remove_block_freeList(void *block)
  * 	Output type:	int
  * 	Description:	Extracts the Block Size
  */
-int get_blockSize(void *ptr)
-{
-	int *pSize;
+int get_blockSize(void* ptr) {
+	int* pSize;
 
 	//	Points to the address where the Length of the block is stored
-	pSize = (int *)ptr;
+	pSize = (int*)ptr;
 	pSize--;
 
 	//	Returns the deferenced size
-	return *(int *)pSize;
+	return *(int*)pSize;
 }
 
 /*
@@ -419,8 +384,7 @@ int get_blockSize(void *ptr)
  * 	Output type:	int
  * 	Description:	Extracts the largest Block Size
  */
-int get_largest_freeBlock()
-{
+int get_largest_freeBlock() {
 	int largestBlockSize = 0;
 
 	//	TODO: Iterate through the Free Block List to find the largest free block and return its size
