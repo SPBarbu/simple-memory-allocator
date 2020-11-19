@@ -18,11 +18,11 @@
  */
 
  /* Includes */
- //  TODO: Add any libraries you might use here.
 #include <string.h>
 #include <unistd.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <math.h> //For ceiling function. Make sure to use -lm compiler option
 
 //  Policies definition
 #define WORST_FIT	1
@@ -48,4 +48,4 @@ static void add_block_freeList(void* block);
 static void remove_block_freeList(void* block);
 static int get_blockSize(void* ptr);
 static int get_largest_freeBlock();
-//  TODO: Declare any private functions that you intend to add in your code.
+static void write_block(char type, void* previous, void* next, int length);

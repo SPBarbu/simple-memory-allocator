@@ -24,9 +24,14 @@
 
 /* Definitions*/
 #define MAX_TOP_FREE (128 * 1024) // Max top free block size = 128 Kbytes
-//	TODO: Change the Header size if required
+
 #define FREE_BLOCK_HEADER_SIZE 2 * sizeof(char *) + sizeof(int) // Size of the Header in a free memory block
-//	TODO: Add constants here
+#define INUSE_BLOCK_HEADER_SIZE sizeof(int) // Size of the Header in a used memory block
+#define BLOCK_TAG_SIZE sizeof(char) // Size of a INUSE/FREE tag. Expect to use 2 at the start and end of a block
+#define INUSE_OVERHEAD (INUSE_BLOCK_HEADER_SIZE + 2 * BLOCK_TAG_SIZE) //Memory overhead for INUSE block
+#define FREE_OVERHEAD (FREE_BLOCK_HEADER_SIZE + 2 * BLOCK_TAG_SIZE)//Memory overhead for FREE block
+#define MIN_EXCESS_SIZE (INUSE_OVERHEAD + 1024) //Minimum excess size for split. 
+#define PBRK_CHUNK_ALLOCATION (64 * 1024)//size of chunk pbrk allocates
 
 typedef enum //	Policy type definition
 {
@@ -40,7 +45,6 @@ void* freeListTail = NULL;			  //	The pointer to the TAIL of the doubly linked f
 unsigned long totalAllocatedSize = 0; //	Total Allocated memory in Bytes
 unsigned long totalFreeSize = 0;	  //	Total Free memory in Bytes in the free memory list
 Policy currentPolicy = WORST;		  //	Current Policy
-//	TODO: Add any global variables here
 
 /*
  * =====================================================================================
@@ -176,10 +180,15 @@ void* sma_realloc(void* ptr, int size) {
 void* allocate_pBrk(int size) {
 	void* newBlock = NULL;
 	int excessSize;
+	
+	int minimum_INUSE_size = size + INUSE_OVERHEAD;
+	int number_chunks_to_allocate = (int)ceil((double)minimum_INUSE_size / PBRK_CHUNK_ALLOCATION);
+	int allocate_size = number_chunks_to_allocate * PBRK_CHUNK_ALLOCATION;
 
-	//	TODO: 	Allocate memory by incrementing the Program Break by calling sbrk() or brk()
-	//	Hint:	Getting an exact "size" of memory might not be the best idea. Why?
-	//			Also, if you are getting a larger memory, you need to put the excess in the free list
+	newBlock = sbrk(allocate_size); //get previous pbrk location and allocation chunks of memory
+	newBlock += BLOCK_TAG_SIZE + size;//points to begining of data
+
+	excessSize = allocate_size - (size + INUSE_OVERHEAD);
 
 	//	Allocates the Memory Block
 	allocate_block(newBlock, size, excessSize, 0);
@@ -277,17 +286,11 @@ void* allocate_next_fit(int size) {
  */
 void allocate_block(void* newBlock, int size, int excessSize, int fromFreeList) {
 	void* excessFreeBlock; //	pointer for any excess free block
-	int addFreeBlock;
 
 	// 	Checks if excess free size is big enough to be added to the free memory list
 	//	Helps to reduce external fragmentation
-
-	//	TODO: Adjust the condition based on your Head and Tail size (depends on your TAG system)
-	//	Hint: Might want to have a minimum size greater than the Head/Tail sizes
-	addFreeBlock = excessSize > FREE_BLOCK_HEADER_SIZE;
-
 	//	If excess free size is big enough
-	if (addFreeBlock) {
+	if (excessSize > MIN_EXCESS_SIZE) {
 		//	TODO: Create a free block using the excess memory size, then assign it to the Excess Free Block
 
 		//	Checks if the new block was allocated from the free memory list
@@ -390,4 +393,14 @@ int get_largest_freeBlock() {
 	//	TODO: Iterate through the Free Block List to find the largest free block and return its size
 
 	return largestBlockSize;
+}
+
+/*
+ * Write the block informations in the header & tag.
+ * For INUSE block, type = 1.
+ * For FREE block, type = 0.
+ * Only specify previous and next for FREE block.
+ */
+void write_block(char type, void* previous, void* next, int length) {
+
 }
