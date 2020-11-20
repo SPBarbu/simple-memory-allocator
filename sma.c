@@ -74,9 +74,6 @@ void test() {
 	hex_dump(block1 - 21, 115);
 
 
-	merge(block1, block2);
-
-
 	// test add block free list
 	// void* block = sbrk(1024) + 21;
 	// add_block_freeList(block, 1);
@@ -424,6 +421,9 @@ void add_block_freeList(void* block, int size) {
 		}
 	}
 
+	merge(PREVIOUS(block), block);
+	merge(block, NEXT(block));
+
 
 	//	TODO: 	Add the block to the free list
 	//	Hint: 	You could add the free block at the end of the list, but need to check if there
@@ -489,8 +489,8 @@ int get_largest_freeBlock() {
  * If the two blocks can be merged, they are merged into the bottom block
  */
 void merge(void* bottom_block, void* top_block) {
-	if (TYPE(bottom_block) != 2 || TYPE(top_block) != 2) return;//if any isn't a FREE block
 	if (!bottom_block || !top_block) return;//if any is empty, merged
+	if (TYPE(bottom_block) != 2 || TYPE(top_block) != 2) return;//if any isn't a FREE block
 	if ((bottom_block + SIZE(bottom_block) + BLOCK_TAG_SIZE) != (top_block - FREE_BLOCK_HEADER_SIZE - BLOCK_TAG_SIZE))return; //if not contiguous memory
 
 	void* previous_block = PREVIOUS(bottom_block);
