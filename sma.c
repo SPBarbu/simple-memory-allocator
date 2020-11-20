@@ -56,16 +56,20 @@ void test() {
 	void* block = sbrk(1024 * 4) + 21;
 	int type = 0;
 	void* previous = 0;
-	void* next = 50;
+	void* next = block + 29;
 	int size = 1;
 	write_block(block, type, previous, next, size);
 
+	freeListHead = block;
+
 	block += 29;
 	type = 0;
-	previous = 21;
+	previous = block - 21;
 	next = NULL;
 	size = 1;
 	write_block(block, type, previous, next, size);
+
+	find_position_in_free_list(block - 27);
 }
 
 /*
@@ -427,7 +431,6 @@ void write_block(void* block, int type, void* previous, void* next, int size) {
 		*(char*)(block - INUSE_BLOCK_HEADER_SIZE - BLOCK_TAG_SIZE) = 1;//head tag
 		*(int*)(block - sizeof(int)) = size + INUSE_OVERHEAD;//length register
 		*(char*)(block + size) = 1;//foot tag
-		hexDump(block - INUSE_OVERHEAD, size + INUSE_OVERHEAD);//TODO remove
 	}
 	else if (type == 0) {//FREE block
 		*(char*)(block - FREE_BLOCK_HEADER_SIZE - BLOCK_TAG_SIZE) = 0;//head tag
@@ -438,15 +441,19 @@ void write_block(void* block, int type, void* previous, void* next, int size) {
 	}
 }
 
-int find_position_in_free_list(void* block, int length) {
+/*
+ * Returns at which position the block should be inserted to preserve block ordering in the free list. 
+ */
+int find_position_in_free_list(void* block) {
 	int position = 0;
 	void* current_block = freeListHead;
+	//iterate through all the free list
 	while (current_block != NULL) {
-		if (current_block > block) {
+		if (current_block > block) {//when we pass in size, it mean we should be inserted there
 			return position;
 		}
 
-		current_block = (void*)(*(((char*)current_block) - (sizeof(int) + sizeof(void*))));//TOTEST
+		current_block = *(void**)(current_block - sizeof(int) - sizeof(void**));
 
 		position++;
 	}
@@ -456,7 +463,7 @@ int find_position_in_free_list(void* block, int length) {
 /**
  * Modified from https://gist.github.com/domnikl/af00cc154e3da1c5d965
  */
-void hexDump(void* addr, int len) {
+void hex_dump(void* addr, int len) {
 	int i;
 	unsigned char buff[17];
 	unsigned char* pc = (unsigned char*)addr;
