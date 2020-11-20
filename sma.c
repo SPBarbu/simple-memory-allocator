@@ -29,7 +29,7 @@
 #define TYPE(BLOCK) (*(char*)(BLOCK+SIZE(BLOCK)))
 
 /* Definitions*/
-#define MAX_TOP_FREE (128 * 1024) // Max top free block size = 128 Kbytes
+#define MAX_TOP_FREE (128) // Max top free block size = 128 Kbytes
 
 #define FREE_BLOCK_HEADER_SIZE (2*sizeof(void*) + sizeof(int)) // Size of the Header in a free memory block
 #define INUSE_BLOCK_HEADER_SIZE (sizeof(int)) // Size of the Header in a used memory block
@@ -60,11 +60,15 @@ Policy currentPolicy = WORST;		  //	Current Policy
 
 void test() {
 
-	// test merge
-	void* block1 = sbrk(2014) + 21;
-	add_block_freeList(block1, 1);
-	void* block2 = block1 + 23;
-	add_block_freeList(block2, 1);
+	// test clean memory
+	void* block1 = sbrk(128) + 21;
+	add_block_freeList(block1, 128 - FREE_OVERHEAD);
+	sbrk(128);
+	void* block2 = block1 + SIZE(block1) + BLOCK_TAG_SIZE + BLOCK_TAG_SIZE + FREE_BLOCK_HEADER_SIZE;
+	add_block_freeList(block2, 128 - FREE_OVERHEAD);
+
+
+
 	void* block3 = block2 + 23;
 	add_block_freeList(block3, 1);
 	block3 += 23;
@@ -423,6 +427,24 @@ void add_block_freeList(void* block, int size) {
 
 	merge(PREVIOUS(block), block);
 	merge(block, NEXT(block));
+
+	/* Clean memory if top is free and larger than MAX_TOP_FREE */
+	void* current_block = freeListHead;
+	while (current_block) {
+		if (!NEXT(current_block)) {//check if current block is the last block
+			if ((SIZE(current_block) + FREE_OVERHEAD) >= MAX_TOP_FREE) {//check if too big
+				if (current_block == freeListHead) {
+					freeListHead = 0;
+				}
+				else {
+					NEXT(PREVIOUS(current_block)) = 0; //make previous block the last block
+				}
+				sbrk((int)((SIZE(current_block) + FREE_OVERHEAD) / 2));//reduce free memory in half
+				add_block_freeList(current_block, ((int)(MAX_TOP_FREE / 2) - FREE_OVERHEAD));//rewrite and add to the free list the block but with half size
+			}
+		}
+		current_block = NEXT(current_block);
+	}
 
 
 	//	TODO: 	Add the block to the free list
