@@ -22,6 +22,12 @@
  /* Includes */
 #include "sma.h" // Please add any libraries you plan to use inside this file
 
+/* Function macros */
+#define PREVIOUS(BLOCK) (*(void**)(BLOCK-sizeof(int)-sizeof(void*)-sizeof(void*)))
+#define NEXT(BLOCK) (*(void**)(BLOCK-sizeof(int)-sizeof(void*)))
+#define LENGTH(BLOCK) (*(int*)(BLOCK-sizeof(int)))
+//define TYPE(BLOCK) could implement if length register of a block represents the size of the data and not the length of the whole block
+
 /* Definitions*/
 #define MAX_TOP_FREE (128 * 1024) // Max top free block size = 128 Kbytes
 
@@ -53,23 +59,40 @@ Policy currentPolicy = WORST;		  //	Current Policy
  */
 
 void test() {
-	void* block = sbrk(1024 * 4) + 21;
-	int type = 0;
-	void* previous = 0;
-	void* next = block + 29;
-	int size = 1;
-	write_block(block, type, previous, next, size);
 
-	freeListHead = block;
+	void* block = sbrk(1024) + 21;
+	add_block_freeList(block, FREE_OVERHEAD + 1);
+	block += 23;
+	block += 23;
+	add_block_freeList(block, FREE_OVERHEAD + 1);
+	block -= 23;
+	add_block_freeList(block, FREE_OVERHEAD + 1);
+	// void* block = sbrk(1024 * 4) + 21;
+	// int type = 0;
+	// void* previous = 0;
+	// void* next = block + 29;
+	// int size = 1;
+	// write_block(block, type, previous, next, size);
 
-	block += 29;
-	type = 0;
-	previous = block - 21;
-	next = NULL;
-	size = 1;
-	write_block(block, type, previous, next, size);
 
-	find_position_in_free_list(block - 27);
+
+	// freeListHead = block;
+
+	// block += 29;
+	// type = 0;
+	// previous = block - 21;
+	// next = block + 29;
+	// size = 1;
+	// write_block(block, type, previous, next, size);
+
+	// block += 29;
+	// type = 0;
+	// previous = block - 21;
+	// next = block + 29;
+	// size = 1;
+	// write_block(block, type, previous, next, size);
+
+	// find_position_in_free_list(block - 75);
 }
 
 /*
@@ -356,7 +379,50 @@ void replace_block_freeList(void* oldBlock, void* newBlock) {
  * 	Output type:	void
  * 	Description:	Adds a memory block to the the free memory list
  */
+ //TODO MERGE adjacent free cells
 void add_block_freeList(void* block, int block_length) {
+	void* previous_block;
+	void* next_block;
+	int position_to_add_at;
+
+	if (!freeListHead) {//empty free list
+		write_block(block, 0, 0, 0, block_length - FREE_OVERHEAD);
+		freeListHead = block;
+	}
+	else {
+		position_to_add_at = find_position_in_free_list(block);
+		if (position_to_add_at == 0) {//self added to head
+			//replace the free list head by self
+
+			next_block = freeListHead;//list head will become self's next
+			PREVIOUS(freeListHead) = block;//self becomes previous of list head
+			freeListHead = block; //self becomes list head
+
+			write_block(block, 0, 0, next_block, block_length - FREE_OVERHEAD);
+		}
+		else {//self added after head
+			int current_pos = 0;
+			void* current_block = freeListHead;
+
+			//find block that will become self's previous
+			while (current_pos <= position_to_add_at) {
+				if (current_pos == position_to_add_at - 1) {
+					previous_block = current_block;//get self's previous block
+					next_block = NEXT(current_block);//get self's next block
+					NEXT(current_block) = block;//update previous block's next as self
+					print_block(current_block, 0);
+					if (next_block != 0) {//if current_block is not the tail
+						PREVIOUS(next_block) = block;//update next block's previous as self
+						print_block(next_block, 0);
+					}
+					write_block(block, 0, previous_block, next_block, block_length - FREE_OVERHEAD);
+				}
+
+				current_block = NEXT(current_block);
+				current_pos++;
+			}
+		}
+	}
 
 
 	//	TODO: 	Add the block to the free list
@@ -365,8 +431,6 @@ void add_block_freeList(void* block, int block_length) {
 	//			Also, you would need to check if merging with the "adjacent" blocks is possible or not.
 	//			Merging would be tideous. Check adjacent blocks, then also check if the merged
 	//			block is at the top and is bigger than the largest free block allowed (128kB).
-
-	//int position = find_position_in_free_list(block, size + FREE_OVERHEAD);
 
 	//	Updates SMA info
 	totalAllocatedSize -= get_blockSize(block);
@@ -396,14 +460,7 @@ void remove_block_freeList(void* block) {
  * 	Description:	Extracts the Block Size
  */
 int get_blockSize(void* ptr) {
-	int* pSize;
-
-	//	Points to the address where the Length of the block is stored
-	pSize = (int*)ptr;
-	pSize--;
-
-	//	Returns the deferenced size
-	return *(int*)pSize;
+	return LENGTH(ptr);
 }
 
 /*
@@ -414,6 +471,14 @@ int get_blockSize(void* ptr) {
  */
 int get_largest_freeBlock() {
 	int largestBlockSize = 0;
+	void* current_block = freeListHead;
+
+	while (current_block != 0) {
+		// if(LENGTH()){
+
+		// }
+		current_block = NEXT(current_block);
+	}
 
 	//	TODO: Iterate through the Free Block List to find the largest free block and return its size
 
@@ -431,18 +496,30 @@ void write_block(void* block, int type, void* previous, void* next, int size) {
 		*(char*)(block - INUSE_BLOCK_HEADER_SIZE - BLOCK_TAG_SIZE) = 1;//head tag
 		*(int*)(block - sizeof(int)) = size + INUSE_OVERHEAD;//length register
 		*(char*)(block + size) = 1;//foot tag
+		print_block(block, 1);
 	}
 	else if (type == 0) {//FREE block
-		*(char*)(block - FREE_BLOCK_HEADER_SIZE - BLOCK_TAG_SIZE) = 0;//head tag
+		*(char*)(block - FREE_BLOCK_HEADER_SIZE - BLOCK_TAG_SIZE) = 2;//head tag
 		*(int*)(block - sizeof(int)) = size + FREE_OVERHEAD;//length register
 		*(void**)(block - sizeof(int) - sizeof(void*)) = next;//next register//TOTEST
 		*(void**)(block - sizeof(int) - sizeof(void*) - sizeof(void*)) = previous;//previous register//TOTEST
-		*(char*)(block + size) = 0;//foot tag
+		*(char*)(block + size) = 2;//foot tag
+		print_block(block, 0);
+	}
+}
+
+void print_block(void* block, int type) {
+	return;
+	if (type == 1) {//INUSE block
+		hex_dump(block - INUSE_BLOCK_HEADER_SIZE - BLOCK_TAG_SIZE, LENGTH(block));
+	}
+	else if (type == 0) {//FREE block
+		hex_dump(block - FREE_BLOCK_HEADER_SIZE - BLOCK_TAG_SIZE, LENGTH(block));
 	}
 }
 
 /*
- * Returns at which position the block should be inserted to preserve block ordering in the free list. 
+ * Returns at which position the block should be inserted to preserve block ordering in the free list.
  */
 int find_position_in_free_list(void* block) {
 	int position = 0;
