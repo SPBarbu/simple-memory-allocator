@@ -50,4 +50,5 @@ static void remove_block_freeList(void* block);
 static int get_blockSize(void* ptr);
 static int get_largest_freeBlock();
 static void write_block(void* block, int type, void* previous, void* next, int size);
-static void hexDump(void* addr, int len);
+static void hex_dump(void* addr, int len);
+void print_block(void* block);

@@ -25,8 +25,8 @@
 /* Function macros */
 #define PREVIOUS(BLOCK) (*(void**)(BLOCK-sizeof(int)-sizeof(void*)-sizeof(void*)))
 #define NEXT(BLOCK) (*(void**)(BLOCK-sizeof(int)-sizeof(void*)))
-#define LENGTH(BLOCK) (*(int*)(BLOCK-sizeof(int)))
-//define TYPE(BLOCK) could implement if length register of a block represents the size of the data and not the length of the whole block
+#define SIZE(BLOCK) (*(int*)(BLOCK-sizeof(int)))
+#define TYPE(BLOCK) (*(char*)(BLOCK+SIZE(BLOCK)))
 
 /* Definitions*/
 #define MAX_TOP_FREE (128 * 1024) // Max top free block size = 128 Kbytes
@@ -61,12 +61,17 @@ Policy currentPolicy = WORST;		  //	Current Policy
 void test() {
 
 	void* block = sbrk(1024) + 21;
-	add_block_freeList(block, FREE_OVERHEAD + 1);
+	add_block_freeList(block, 1);
 	block += 23;
 	block += 23;
-	add_block_freeList(block, FREE_OVERHEAD + 1);
+	add_block_freeList(block, 1);
 	block -= 23;
-	add_block_freeList(block, FREE_OVERHEAD + 1);
+	add_block_freeList(block, 1);
+
+
+
+
+
 	// void* block = sbrk(1024 * 4) + 21;
 	// int type = 0;
 	// void* previous = 0;
@@ -151,7 +156,8 @@ void sma_free(void* ptr) {
 	}
 	else {
 		//	Adds the block to the free memory list
-		add_block_freeList(ptr, *(int*)(ptr - sizeof(int)));
+		//overhead for free list is bigger so need to change properties
+		add_block_freeList(ptr + (FREE_BLOCK_HEADER_SIZE - INUSE_BLOCK_HEADER_SIZE), SIZE(ptr) - (FREE_BLOCK_HEADER_SIZE - INUSE_BLOCK_HEADER_SIZE));
 	}
 }
 
@@ -232,10 +238,12 @@ void* allocate_pBrk(int size) {
 	newBlock = sbrk(allocate_size); //get previous pbrk location and request chunks of memory
 	newBlock += BLOCK_TAG_SIZE + INUSE_BLOCK_HEADER_SIZE;//points to begining of data
 
-	excessSize = allocate_size - (size + INUSE_OVERHEAD);
+	int newBlock_size = size + FREE_OVERHEAD; // adding free overhead rather than just inuse overhead so can convert to free when needed b/c free overhead is move than inuse overhead
+
+	excessSize = allocate_size - (newBlock_size);
 
 	//	Allocates the Memory Block
-	allocate_block(newBlock, size, excessSize, 0);
+	allocate_block(newBlock, newBlock_size, excessSize, 0);
 
 	return newBlock;
 }
@@ -333,9 +341,10 @@ void allocate_block(void* newBlock, int size, int excessSize, int fromFreeList) 
 
 	// 	Checks if excess free size is big enough to be added to the free memory list
 	if (excessSize > MIN_EXCESS_SIZE) {
-		write_block(newBlock, 1, (void*)0, (void*)0, size);//write the inuse block to memory
+		write_block(newBlock, 1, 0, 0, size);//write the inuse block to memory
 		//	TODO: Create a free block using the excess memory size, then assign it to the Excess Free Block
 		excessFreeBlock = newBlock + size + BLOCK_TAG_SIZE + BLOCK_TAG_SIZE + FREE_BLOCK_HEADER_SIZE; // points to data of free block
+		excessSize -= FREE_OVERHEAD;//excessSize is length of whole excess block
 
 		//	Checks if the new block was allocated from the free memory list
 		if (fromFreeList) {
@@ -348,7 +357,7 @@ void allocate_block(void* newBlock, int size, int excessSize, int fromFreeList) 
 		}
 	}
 	else {
-		write_block(newBlock, 1, (void*)0, (void*)0, size + excessSize);//write the inuse block to memory with excess size to it
+		write_block(newBlock, 1, 0, 0, size + excessSize);//write the inuse block to memory with excess size to it
 		//	TODO: Add excessSize to size and assign it to the new Block
 
 		//	Checks if the new block was allocated from the free memory list
@@ -380,13 +389,13 @@ void replace_block_freeList(void* oldBlock, void* newBlock) {
  * 	Description:	Adds a memory block to the the free memory list
  */
  //TODO MERGE adjacent free cells
-void add_block_freeList(void* block, int block_length) {
+void add_block_freeList(void* block, int size) {
 	void* previous_block;
 	void* next_block;
 	int position_to_add_at;
 
 	if (!freeListHead) {//empty free list
-		write_block(block, 0, 0, 0, block_length - FREE_OVERHEAD);
+		write_block(block, 0, 0, 0, size);
 		freeListHead = block;
 	}
 	else {
@@ -396,9 +405,10 @@ void add_block_freeList(void* block, int block_length) {
 
 			next_block = freeListHead;//list head will become self's next
 			PREVIOUS(freeListHead) = block;//self becomes previous of list head
+			print_block(freeListHead);
 			freeListHead = block; //self becomes list head
 
-			write_block(block, 0, 0, next_block, block_length - FREE_OVERHEAD);
+			write_block(block, 0, 0, next_block, size);
 		}
 		else {//self added after head
 			int current_pos = 0;
@@ -410,12 +420,12 @@ void add_block_freeList(void* block, int block_length) {
 					previous_block = current_block;//get self's previous block
 					next_block = NEXT(current_block);//get self's next block
 					NEXT(current_block) = block;//update previous block's next as self
-					print_block(current_block, 0);
+					print_block(current_block);
 					if (next_block != 0) {//if current_block is not the tail
 						PREVIOUS(next_block) = block;//update next block's previous as self
-						print_block(next_block, 0);
+						print_block(next_block);
 					}
-					write_block(block, 0, previous_block, next_block, block_length - FREE_OVERHEAD);
+					write_block(block, 0, previous_block, next_block, size);
 				}
 
 				current_block = NEXT(current_block);
@@ -460,7 +470,7 @@ void remove_block_freeList(void* block) {
  * 	Description:	Extracts the Block Size
  */
 int get_blockSize(void* ptr) {
-	return LENGTH(ptr);
+	return SIZE(ptr);
 }
 
 /*
@@ -474,7 +484,7 @@ int get_largest_freeBlock() {
 	void* current_block = freeListHead;
 
 	while (current_block != 0) {
-		// if(LENGTH()){
+		// if(SIZE()){
 
 		// }
 		current_block = NEXT(current_block);
@@ -494,27 +504,27 @@ int get_largest_freeBlock() {
 void write_block(void* block, int type, void* previous, void* next, int size) {
 	if (type == 1) {//INUSE block
 		*(char*)(block - INUSE_BLOCK_HEADER_SIZE - BLOCK_TAG_SIZE) = 1;//head tag
-		*(int*)(block - sizeof(int)) = size + INUSE_OVERHEAD;//length register
+		*(int*)(block - sizeof(int)) = size;//size register
 		*(char*)(block + size) = 1;//foot tag
-		print_block(block, 1);
+		print_block(block);
 	}
 	else if (type == 0) {//FREE block
 		*(char*)(block - FREE_BLOCK_HEADER_SIZE - BLOCK_TAG_SIZE) = 2;//head tag
-		*(int*)(block - sizeof(int)) = size + FREE_OVERHEAD;//length register
+		*(int*)(block - sizeof(int)) = size;//length register
 		*(void**)(block - sizeof(int) - sizeof(void*)) = next;//next register//TOTEST
 		*(void**)(block - sizeof(int) - sizeof(void*) - sizeof(void*)) = previous;//previous register//TOTEST
 		*(char*)(block + size) = 2;//foot tag
-		print_block(block, 0);
+		print_block(block);
 	}
 }
 
-void print_block(void* block, int type) {
-	return;
-	if (type == 1) {//INUSE block
-		hex_dump(block - INUSE_BLOCK_HEADER_SIZE - BLOCK_TAG_SIZE, LENGTH(block));
+void print_block(void* block) {
+	// return;
+	if (TYPE(block) == 1) {//INUSE block
+		hex_dump(block - INUSE_BLOCK_HEADER_SIZE - BLOCK_TAG_SIZE, SIZE(block) + INUSE_OVERHEAD);
 	}
-	else if (type == 0) {//FREE block
-		hex_dump(block - FREE_BLOCK_HEADER_SIZE - BLOCK_TAG_SIZE, LENGTH(block));
+	else if (TYPE(block) == 2) {//FREE block
+		hex_dump(block - FREE_BLOCK_HEADER_SIZE - BLOCK_TAG_SIZE, SIZE(block) + FREE_OVERHEAD);
 	}
 }
 

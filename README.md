@@ -1,5 +1,7 @@
 For the grader: Regarding the runtime errors of misaligned memory accessing; Professor Maheswaran confirmed with me that it should not be penalized.
 
+
+|type|size|relative position
 FREE block:
 |char tag = '0'|1|length-1
 |data|X|21
@@ -8,7 +10,7 @@ FREE block:
 |void* previous|8|1
 |char tag = '0'|1|0
 
-INUSE block
+INUSE block:
 |char tag = '1'|1|length-1
 |data|X|5
 |int length|4|1
@@ -18,7 +20,6 @@ A block's "start" ie what previous & next point to is the data's first memory lo
 
 The linked list for the free blocks maintains the blocks by increasing memory position. IE, the first block is the lowest on the heap and the last, the highest on the heap.
 Made this decision of preserving free blocks in order after implementing the tags in the blocks. The tags are useless if the ordering can be preserved. Possibly remove so it doesn't cause misalignment anymore, but not critical.
-
 
 To minimize external fragmentation, a contiguous block is split only if the unused block is at least 1024 bytes + FREE_BLOCK_HEADER_SIZE + 2 * BLOCK_TAG_SIZE in length, ie it can fit one 1024 bytes block + the overhead.
 
