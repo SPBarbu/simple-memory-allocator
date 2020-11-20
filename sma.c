@@ -77,7 +77,7 @@ void* sma_malloc(int size) {
 			// Allocate memory by increasing the Program Break
 			pMemory = allocate_pBrk(size);
 		}
-	}
+	}//TODO support if top of free list is free but not big enough to fit size
 
 	// Validates memory allocation
 	if (pMemory < 0 || pMemory == NULL) {
@@ -180,13 +180,13 @@ void* sma_realloc(void* ptr, int size) {
 void* allocate_pBrk(int size) {
 	void* newBlock = NULL;
 	int excessSize;
-	
+
 	int minimum_INUSE_size = size + INUSE_OVERHEAD;
 	int number_chunks_to_allocate = (int)ceil((double)minimum_INUSE_size / PBRK_CHUNK_ALLOCATION);
 	int allocate_size = number_chunks_to_allocate * PBRK_CHUNK_ALLOCATION;
 
 	newBlock = sbrk(allocate_size); //get previous pbrk location and allocation chunks of memory
-	newBlock += BLOCK_TAG_SIZE + size;//points to begining of data
+	newBlock += BLOCK_TAG_SIZE + INUSE_BLOCK_HEADER_SIZE;//points to begining of data
 
 	excessSize = allocate_size - (size + INUSE_OVERHEAD);
 
@@ -288,10 +288,11 @@ void allocate_block(void* newBlock, int size, int excessSize, int fromFreeList) 
 	void* excessFreeBlock; //	pointer for any excess free block
 
 	// 	Checks if excess free size is big enough to be added to the free memory list
-	//	Helps to reduce external fragmentation
-	//	If excess free size is big enough
 	if (excessSize > MIN_EXCESS_SIZE) {
+		write_block(newBlock, 1, (void*)0, (void*)0, size);//write the inuse block to memory
 		//	TODO: Create a free block using the excess memory size, then assign it to the Excess Free Block
+		excessFreeBlock = newBlock + size + BLOCK_TAG_SIZE + BLOCK_TAG_SIZE + FREE_OVERHEAD; // points to data of free block
+		int position = find_position_in_free_list(excessFreeBlock, size + FREE_OVERHEAD);
 
 		//	Checks if the new block was allocated from the free memory list
 		if (fromFreeList) {
@@ -303,8 +304,8 @@ void allocate_block(void* newBlock, int size, int excessSize, int fromFreeList) 
 			add_block_freeList(excessFreeBlock);
 		}
 	}
-	//	Otherwise add the excess memory to the new block
 	else {
+		write_block(newBlock, 1, (void*)0, (void*)0, size + excessSize);//write the inuse block to memory with excess size to it
 		//	TODO: Add excessSize to size and assign it to the new Block
 
 		//	Checks if the new block was allocated from the free memory list
@@ -401,6 +402,87 @@ int get_largest_freeBlock() {
  * For FREE block, type = 0.
  * Only specify previous and next for FREE block.
  */
-void write_block(char type, void* previous, void* next, int length) {
+void write_block(void* block, int type, void* previous, void* next, int size) {
+	if (type == 1) {//INUSE block
+		*(char*)(block - INUSE_BLOCK_HEADER_SIZE - BLOCK_TAG_SIZE) = 1;//head tag
+		*(int*)(block - sizeof(int)) = size + INUSE_OVERHEAD;//length register
+		*(char*)(block + size) = 1;//foot tag
+	}
+	else if (type == 0) {//FREE block
+		*(char*)(block - INUSE_BLOCK_HEADER_SIZE - BLOCK_TAG_SIZE) = 1;//head tag
+		*(int*)(block - sizeof(int)) = size + INUSE_OVERHEAD;//length register
+		*(void**)(block - sizeof(int) - sizeof(void*)) = next;//next register//TOTEST
+		*(void**)(block - sizeof(int) - sizeof(void*) - sizeof(void*)) = previous;//previous register//TOTEST
+		*(char*)(block + size) = 1;//foot tag
+	}
 
+}
+
+int find_position_in_free_list(void* block, int length) {
+	int position = 0;
+	void* current_block = freeListHead;
+	while (current_block != NULL) {
+		if (current_block > block) {
+			return position;
+		}
+
+		current_block = (void*)(*(((char*)current_block) - (sizeof(int) + sizeof(void*))));//TOTEST
+
+		position++;
+	}
+	return position;
+}
+
+/**
+ * Modified from https://gist.github.com/domnikl/af00cc154e3da1c5d965
+ */
+void hexDump(void* addr, int len) {
+	int i;
+	unsigned char buff[17];
+	unsigned char* pc = (unsigned char*)addr;
+	char str[20];
+
+	fputs("---\n", stdout);//indicate start
+
+	// Process every byte in the data.
+	for (i = 0; i < len; i++) {
+
+		// Multiple of 16 means new line (with line offset).
+		if ((i % 16) == 0) {
+			// Just don't print ASCII for the zeroth line.
+			if (i != 0) {
+				sprintf(str, "  %s\n", buff);
+				fputs(str, stdout);
+			}
+			// Output the offset.
+			sprintf(str, "  %p ", i + addr);
+			fputs(str, stdout);
+		}
+
+		// Output the hex code for the specific character.
+		sprintf(str, " %02x", pc[i]);
+		fputs(str, stdout);
+
+
+		// And store a printable ASCII character for later.
+		if ((pc[i] < 0x20) || (pc[i] > 0x7e)) {
+			buff[i % 16] = '.';
+		}
+		else {
+			buff[i % 16] = pc[i];
+		}
+
+		buff[(i % 16) + 1] = '\0';
+	}
+
+	// Pad out last line if not exactly 16 characters.
+	while ((i % 16) != 0) {
+		sprintf(str, "   ");
+		fputs(str, stdout);
+		i++;
+	}
+
+	// And print the final ASCII bit.
+	sprintf(str, "  %s\n", buff);
+	fputs(str, stdout);
 }

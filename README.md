@@ -1,16 +1,16 @@
 FREE block:
-|char tag = '0'
-|void* previous
-|void* next
-|int length
+|short tag = '0'
 |data
-|char tag = '0'
+|int length
+|void* next
+|void* previous
+|short tag = '0'
 
 INUSE block
-|char tag = '1'
-|int length
+|short tag = '1'
 |data
-|char tag = '1'
+|int length
+|short tag = '1'
 
 A block's "start" ie what previous & next point to is the data's first memory location.
 

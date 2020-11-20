@@ -48,4 +48,5 @@ static void add_block_freeList(void* block);
 static void remove_block_freeList(void* block);
 static int get_blockSize(void* ptr);
 static int get_largest_freeBlock();
-static void write_block(char type, void* previous, void* next, int length);
+static void write_block(void* block, int type, void* previous, void* next, int size);
+static void hexDump(void* addr, int len);
