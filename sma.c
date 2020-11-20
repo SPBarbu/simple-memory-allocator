@@ -60,44 +60,31 @@ Policy currentPolicy = WORST;		  //	Current Policy
 
 void test() {
 
-	void* block = sbrk(1024) + 21;
-	add_block_freeList(block, 1);
-	block += 23;
-	block += 23;
-	add_block_freeList(block, 1);
-	block -= 23;
-	add_block_freeList(block, 1);
+	// test merge
+	void* block1 = sbrk(2014) + 21;
+	add_block_freeList(block1, 1);
+	void* block2 = block1 + 23;
+	add_block_freeList(block2, 1);
+	void* block3 = block2 + 23;
+	add_block_freeList(block3, 1);
+	block3 += 23;
+	add_block_freeList(block3, 1);
+	block3 += 23;
+	add_block_freeList(block3, 1);
+	hex_dump(block1 - 21, 115);
 
 
+	merge(block1, block2);
 
 
-
-	// void* block = sbrk(1024 * 4) + 21;
-	// int type = 0;
-	// void* previous = 0;
-	// void* next = block + 29;
-	// int size = 1;
-	// write_block(block, type, previous, next, size);
-
-
-
-	// freeListHead = block;
-
-	// block += 29;
-	// type = 0;
-	// previous = block - 21;
-	// next = block + 29;
-	// size = 1;
-	// write_block(block, type, previous, next, size);
-
-	// block += 29;
-	// type = 0;
-	// previous = block - 21;
-	// next = block + 29;
-	// size = 1;
-	// write_block(block, type, previous, next, size);
-
-	// find_position_in_free_list(block - 75);
+	// test add block free list
+	// void* block = sbrk(1024) + 21;
+	// add_block_freeList(block, 1);
+	// block += 23;
+	// block += 23;
+	// add_block_freeList(block, 1);
+	// block -= 23;
+	// add_block_freeList(block, 1);
 }
 
 /*
@@ -189,8 +176,11 @@ void sma_mallinfo() {
 	char str[60];
 
 	//	Prints the SMA Stats
-	sprintf(str, "Total number of bytes allocated: %lu", totalAllocatedSize);
+	sprintf(str, "Total number of bytes allocated for data: %lu", totalAllocatedSize);
 	puts(str);
+	//TODO
+	// sprintf(str, "Total number of bytes allocated including overhead: %lu", totalAllocatedSize);
+	// puts(str);
 	sprintf(str, "Total free space: %lu", totalFreeSize);
 	puts(str);
 	sprintf(str, "Size of largest contigious free space (in bytes): %d", largestFreeBlock);
@@ -228,22 +218,22 @@ void* sma_realloc(void* ptr, int size) {
   */
 void* allocate_pBrk(int size) {
 	void* newBlock = NULL;
-	int excessSize;
+	int excessLength;
 
 	//calculate number of chunks to request
-	int minimum_INUSE_size = size + INUSE_OVERHEAD;
+	int minimum_INUSE_size = size + FREE_OVERHEAD;
 	int number_chunks_to_allocate = (int)ceil((double)minimum_INUSE_size / PBRK_CHUNK_ALLOCATION);
 	int allocate_size = number_chunks_to_allocate * PBRK_CHUNK_ALLOCATION;
 
 	newBlock = sbrk(allocate_size); //get previous pbrk location and request chunks of memory
 	newBlock += BLOCK_TAG_SIZE + INUSE_BLOCK_HEADER_SIZE;//points to begining of data
 
-	int newBlock_size = size + FREE_OVERHEAD; // adding free overhead rather than just inuse overhead so can convert to free when needed b/c free overhead is move than inuse overhead
+	int newBlock_size = size + FREE_OVERHEAD - INUSE_OVERHEAD; // adding free overhead rather than just inuse overhead so can convert to free when needed b/c free overhead is move than inuse overhead
 
-	excessSize = allocate_size - (newBlock_size);
+	excessLength = allocate_size - (newBlock_size + INUSE_OVERHEAD);
 
 	//	Allocates the Memory Block
-	allocate_block(newBlock, newBlock_size, excessSize, 0);
+	allocate_block(newBlock, newBlock_size, excessLength, 0);
 
 	return newBlock;
 }
@@ -336,28 +326,30 @@ void* allocate_next_fit(int size) {
  * 	Output type:	void
  * 	Description:	Performs routine operations for allocating a memory block
  */
-void allocate_block(void* newBlock, int size, int excessSize, int fromFreeList) {
+void allocate_block(void* newBlock, int size, int excessLength, int fromFreeList) {
 	void* excessFreeBlock; //	pointer for any excess free block
+	int excessSize;
 
 	// 	Checks if excess free size is big enough to be added to the free memory list
-	if (excessSize > MIN_EXCESS_SIZE) {
+	if (excessLength > MIN_EXCESS_SIZE) {
+
 		write_block(newBlock, 1, 0, 0, size);//write the inuse block to memory
 		//	TODO: Create a free block using the excess memory size, then assign it to the Excess Free Block
 		excessFreeBlock = newBlock + size + BLOCK_TAG_SIZE + BLOCK_TAG_SIZE + FREE_BLOCK_HEADER_SIZE; // points to data of free block
-		excessSize -= FREE_OVERHEAD;//excessSize is length of whole excess block
+		excessSize = excessLength - FREE_OVERHEAD;//excessSize is length of whole excess block
 
 		//	Checks if the new block was allocated from the free memory list
 		if (fromFreeList) {
 			//	Removes new block and adds the excess free block to the free list
 			replace_block_freeList(newBlock, excessFreeBlock);
 		}
-		else {//DOING
+		else {
 			//	Adds excess free block to the free list
 			add_block_freeList(excessFreeBlock, excessSize);
 		}
 	}
 	else {
-		write_block(newBlock, 1, 0, 0, size + excessSize);//write the inuse block to memory with excess size to it
+		write_block(newBlock, 1, 0, 0, size + excessLength);//write the inuse block to memory with excess size to it
 		//	TODO: Add excessSize to size and assign it to the new Block
 
 		//	Checks if the new block was allocated from the free memory list
@@ -389,6 +381,7 @@ void replace_block_freeList(void* oldBlock, void* newBlock) {
  * 	Description:	Adds a memory block to the the free memory list
  */
  //TODO MERGE adjacent free cells
+ //TODO heap if top is free and larger than MAX_TOP_FREE
 void add_block_freeList(void* block, int size) {
 	void* previous_block;
 	void* next_block;
@@ -405,7 +398,6 @@ void add_block_freeList(void* block, int size) {
 
 			next_block = freeListHead;//list head will become self's next
 			PREVIOUS(freeListHead) = block;//self becomes previous of list head
-			print_block(freeListHead);
 			freeListHead = block; //self becomes list head
 
 			write_block(block, 0, 0, next_block, size);
@@ -420,10 +412,8 @@ void add_block_freeList(void* block, int size) {
 					previous_block = current_block;//get self's previous block
 					next_block = NEXT(current_block);//get self's next block
 					NEXT(current_block) = block;//update previous block's next as self
-					print_block(current_block);
 					if (next_block != 0) {//if current_block is not the tail
 						PREVIOUS(next_block) = block;//update next block's previous as self
-						print_block(next_block);
 					}
 					write_block(block, 0, previous_block, next_block, size);
 				}
@@ -493,6 +483,28 @@ int get_largest_freeBlock() {
 	//	TODO: Iterate through the Free Block List to find the largest free block and return its size
 
 	return largestBlockSize;
+}
+
+/**
+ * If the two blocks can be merged, they are merged into the bottom block
+ */
+void merge(void* bottom_block, void* top_block) {
+	if (TYPE(bottom_block) != 2 || TYPE(top_block) != 2) return;//if any isn't a FREE block
+	if (!bottom_block || !top_block) return;//if any is empty, merged
+	if ((bottom_block + SIZE(bottom_block) + BLOCK_TAG_SIZE) != (top_block - FREE_BLOCK_HEADER_SIZE - BLOCK_TAG_SIZE))return; //if not contiguous memory
+
+	void* previous_block = PREVIOUS(bottom_block);
+	void* next_block = NEXT(top_block);
+	int size = SIZE(bottom_block) + SIZE(top_block) + FREE_OVERHEAD;
+
+	if (next_block) {//check if top_block is not last
+		PREVIOUS(next_block) = bottom_block;
+	}
+	if (previous_block) {//check if bottom_block is not first
+		NEXT(previous_block) = bottom_block;
+	}
+	write_block(bottom_block, 0, previous_block, next_block, size);
+
 }
 
 /*
