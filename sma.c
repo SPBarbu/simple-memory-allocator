@@ -69,12 +69,25 @@ void test() {
 	// void* b1 = allocate_worst_fit(1);
 
 
-	// test clean memory
-	void* block1 = sbrk(128) + 21;
-	add_block_freeList(block1, 128 - FREE_OVERHEAD);
-	sbrk(128);
-	void* block2 = block1 + SIZE(block1) + BLOCK_TAG_SIZE + BLOCK_TAG_SIZE + FREE_BLOCK_HEADER_SIZE;
-	add_block_freeList(block2, 128 - FREE_OVERHEAD);
+	// //test clean memory
+	// void* block1 = sbrk(128) + 21;
+	// add_block_freeList(block1, 128 - FREE_OVERHEAD);
+	// sbrk(128);
+	// void* block2 = block1 + SIZE(block1) + BLOCK_TAG_SIZE + BLOCK_TAG_SIZE + FREE_BLOCK_HEADER_SIZE;
+	// add_block_freeList(block2, 128 - FREE_OVERHEAD);
+	// sbrk(128);
+	// block2 = block1 + SIZE(block1) + BLOCK_TAG_SIZE + BLOCK_TAG_SIZE + FREE_BLOCK_HEADER_SIZE;
+	// add_block_freeList(block2, 128 - FREE_OVERHEAD);
+	// sbrk(128);
+	// block2 = block1 + SIZE(block1) + BLOCK_TAG_SIZE + BLOCK_TAG_SIZE + FREE_BLOCK_HEADER_SIZE;
+	// add_block_freeList(block2, 128 - FREE_OVERHEAD);
+	// sbrk(128);
+	// block2 = block1 + SIZE(block1) + BLOCK_TAG_SIZE + BLOCK_TAG_SIZE + FREE_BLOCK_HEADER_SIZE;
+	// add_block_freeList(block2, 128 - FREE_OVERHEAD);
+	// sbrk(128);
+	// block2 = block1 + SIZE(block1) + BLOCK_TAG_SIZE + BLOCK_TAG_SIZE + FREE_BLOCK_HEADER_SIZE;
+	// add_block_freeList(block2, 128 - FREE_OVERHEAD);
+
 
 
 	// test add block free list
@@ -457,22 +470,25 @@ void add_block_freeList(void* block, int size) {
 
 	merge(PREVIOUS(block), block);
 	merge(block, NEXT(block));
+	//cant reuse block variable after merging
 
 
 	/* Clean memory if top is free and larger than MAX_TOP_FREE */
-	//if(!reallocating) { // dont clean memory if reallocating
-	void* current_block = block;
-	int current_block_size = SIZE(current_block);
-	if (!NEXT(current_block)) {//check if current block is the last block
-		if ((current_block_size + FREE_OVERHEAD) >= MAX_TOP_FREE) {//check if too big
-			if (current_block == freeListHead) {
-				freeListHead = 0;
+	void* current_block = freeListHead;
+	while (current_block) {
+		if (!NEXT(current_block)) {//check if current block is the last block
+			if ((SIZE(current_block) + FREE_OVERHEAD) >= MAX_TOP_FREE) {//check if too big
+				if (current_block == freeListHead) {
+					freeListHead = 0;
+				}
+				else {
+					NEXT(PREVIOUS(current_block)) = 0; //make previous block the last block
+				}
+				sbrk(-((int)((SIZE(current_block) + FREE_OVERHEAD) / 2)));
+				add_block_freeList(current_block, SIZE(current_block) - ((int)((SIZE(current_block) + FREE_OVERHEAD) / 2)));
 			}
-			else {
-				NEXT(PREVIOUS(current_block)) = 0; //make previous block the last block
-			}
-			sbrk(-((int)((current_block_size + FREE_OVERHEAD) / 2)));
-			add_block_freeList(current_block, current_block_size - ((int)((current_block_size + FREE_OVERHEAD) / 2)));}
+		}
+		current_block = NEXT(current_block);
 	}
 
 	//	Updates SMA info
@@ -558,6 +574,7 @@ void write_block(void* block, int type, void* previous, void* next, int size) {
 		*(char*)(block - INUSE_BLOCK_HEADER_SIZE - BLOCK_TAG_SIZE) = 1;//head tag
 		*(int*)(block - sizeof(int)) = size;//size register
 		*(char*)(block + size) = 1;//foot tag
+		memset(block, 0, SIZE(block));
 		print_block(block);
 	}
 	else if (type == 0) {//FREE block
@@ -566,9 +583,10 @@ void write_block(void* block, int type, void* previous, void* next, int size) {
 		*(void**)(block - sizeof(int) - sizeof(void*)) = next;//next register//TOTEST
 		*(void**)(block - sizeof(int) - sizeof(void*) - sizeof(void*)) = previous;//previous register//TOTEST
 		*(char*)(block + size) = 0;//foot tag
+		memset(block, 0, SIZE(block));
 		print_block(block);
 	}
-	memset(block, 0, SIZE(block));
+
 }
 
 void print_heap() {
