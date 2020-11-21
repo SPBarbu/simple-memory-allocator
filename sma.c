@@ -29,15 +29,15 @@
 #define TYPE(BLOCK) (*(char*)(BLOCK+SIZE(BLOCK)))
 
 /* Definitions*/
-#define MAX_TOP_FREE (128) // Max top free block size = 128 Kbytes
+#define MAX_TOP_FREE (128 * 1024) // Max top free block size = 128 Kbytes
 
 #define FREE_BLOCK_HEADER_SIZE (2*sizeof(void*) + sizeof(int)) // Size of the Header in a free memory block
 #define INUSE_BLOCK_HEADER_SIZE (sizeof(int)) // Size of the Header in a used memory block
 #define BLOCK_TAG_SIZE (sizeof(char)) // Size of a INUSE/FREE tag. Expect to use 2 at the start and end of a block
 #define INUSE_OVERHEAD (INUSE_BLOCK_HEADER_SIZE + 2 * BLOCK_TAG_SIZE) //Memory overhead for INUSE block
 #define FREE_OVERHEAD (FREE_BLOCK_HEADER_SIZE + 2 * BLOCK_TAG_SIZE)//Memory overhead for FREE block
-#define MIN_EXCESS_SIZE (INUSE_OVERHEAD + 32) //Minimum excess size for split. 
-#define PBRK_CHUNK_ALLOCATION (128)//size of chunk pbrk allocates
+#define MIN_EXCESS_SIZE (1024 - INUSE_OVERHEAD) //Minimum excess size for split. 
+#define PBRK_CHUNK_ALLOCATION (16 * 1024)//size of chunk pbrk allocates
 
 typedef enum //	Policy type definition
 {
@@ -61,6 +61,18 @@ void* heap_start = 0;
  */
 
 void test() {
+	print_heap();
+	// //test worst fit
+	// sma_malloc(1);
+	// print_heap();
+	// sma_malloc(1);
+	// print_heap();
+	// sma_malloc(1);
+	// print_heap();
+	// sma_malloc(12);
+	// print_heap();
+	// sma_malloc(12);
+	// print_heap();
 
 	// //test worst fit
 	// heap_start = sbrk(0);
@@ -270,7 +282,7 @@ void* allocate_pBrk(int size) {
 	int allocate_size = number_chunks_to_allocate * PBRK_CHUNK_ALLOCATION;
 
 	newBlock = sbrk(allocate_size); //get previous pbrk location and request chunks of memory
-	if (heap_start = 0)
+	if (heap_start == 0)
 		heap_start = newBlock;
 	newBlock += BLOCK_TAG_SIZE + INUSE_BLOCK_HEADER_SIZE;//points to begining of data
 
@@ -292,6 +304,7 @@ void* allocate_pBrk(int size) {
  */
 void* allocate_freeList(int size) {
 	void* pMemory = NULL;
+	size += (FREE_OVERHEAD - INUSE_OVERHEAD);//insures it can be turn into a FREE block after it's freed
 
 	if (currentPolicy == WORST) {
 		// Allocates memory using Worst Fit Policy
@@ -316,17 +329,27 @@ void* allocate_freeList(int size) {
  */
 void* allocate_worst_fit(int size) {
 	void* worstBlock = NULL;
-	int excessSize;
-	int blockFound = 0;
+	int excessLength = 0;
+	void* current_block = freeListHead; //start iteration by the head
 
-	//	TODO: 	Allocate memory by using Worst Fit Policy
-	//	Hint:	Start off with the freeListHead and iterate through the entire list to 
-	//			get the largest block
+	while (current_block) {//check if theres a next block
+		if (SIZE(current_block) + FREE_OVERHEAD >= size) {//check if big enough
+			if (!worstBlock || SIZE(current_block) + FREE_OVERHEAD > SIZE(worstBlock) + FREE_OVERHEAD) {//valid if first big enough or bigger than the previous worst
+				worstBlock = current_block;
+			}
+
+		}
+		current_block = NEXT(current_block);
+	}
 
 	//	Checks if appropriate block is found.
-	if (blockFound) {
+	if (worstBlock) {
+		void* new_block_insert_at = worstBlock - (FREE_OVERHEAD - INUSE_OVERHEAD);
+		//assumes allocate_freeList already took care of adding space for the free block header so size of new block is size
+		excessLength = SIZE(worstBlock) + FREE_OVERHEAD - size - INUSE_OVERHEAD;
+
 		//	Allocates the Memory Block
-		allocate_block(worstBlock, size, excessSize, 1);
+		allocate_block(new_block_insert_at, size, excessLength, 1);
 	}
 	else {
 		//	Assigns invalid address if appropriate block not found in free list
@@ -375,11 +398,12 @@ void* allocate_next_fit(int size) {
 void allocate_block(void* newBlock, int size, int excessLength, int fromFreeList) {
 	void* excessFreeBlock; //	pointer for any excess free block
 	int excessSize;
+	void* old_free_position = newBlock + (FREE_OVERHEAD - INUSE_OVERHEAD);
 
 	// 	Checks if excess free size is big enough to be added to the free memory list
 	if (excessLength > MIN_EXCESS_SIZE) {
 
-		write_block(newBlock, 1, 0, 0, size);//write the inuse block to memory
+
 		//	TODO: Create a free block using the excess memory size, then assign it to the Excess Free Block
 		excessFreeBlock = newBlock + size + BLOCK_TAG_SIZE + BLOCK_TAG_SIZE + FREE_BLOCK_HEADER_SIZE; // points to data of free block
 		excessSize = excessLength - FREE_OVERHEAD;//excessSize is length of whole excess block
@@ -387,9 +411,11 @@ void allocate_block(void* newBlock, int size, int excessLength, int fromFreeList
 		//	Checks if the new block was allocated from the free memory list
 		if (fromFreeList) {
 			//	Removes new block and adds the excess free block to the free list
-			replace_block_freeList(newBlock, excessFreeBlock);
+			replace_block_freeList(old_free_position, excessFreeBlock, excessSize);
+			write_block(newBlock, 1, 0, 0, size);//write the inuse block to memory
 		}
 		else {
+			write_block(newBlock, 1, 0, 0, size);//write the inuse block to memory
 			//	Adds excess free block to the free list
 			add_block_freeList(excessFreeBlock, excessSize);
 		}
@@ -401,7 +427,7 @@ void allocate_block(void* newBlock, int size, int excessLength, int fromFreeList
 		//	Checks if the new block was allocated from the free memory list
 		if (fromFreeList) {
 			//	Removes the new block from the free list
-			remove_block_freeList(newBlock);
+			remove_block_freeList(old_free_position);
 		}
 	}
 }
@@ -410,10 +436,24 @@ void allocate_block(void* newBlock, int size, int excessLength, int fromFreeList
  *	Funcation Name: replace_block_freeList
  *	Input type:		void*, void*
  * 	Output type:	void
- * 	Description:	Replaces old block with the new block in the free list
+ * 	Description:	Updates references of neighbours to oldBlock to newBlock and rewrite to new position
  */
-void replace_block_freeList(void* oldBlock, void* newBlock) {
-	//	TODO: Replace the old block with the new block
+void replace_block_freeList(void* oldBlock, void* newBlock, int size) {
+
+	void* previous_block = PREVIOUS(oldBlock);
+	void* next_block = NEXT(oldBlock);
+
+	if (previous_block) {
+		NEXT(previous_block) = newBlock;//update self reference in previous
+	}
+	if (next_block) {
+		PREVIOUS(next_block) = newBlock;//update self reference in next
+	}
+	if (freeListHead == oldBlock) {
+		freeListHead = newBlock;
+	}
+	write_block(newBlock, 0, previous_block, next_block, size);
+
 
 	//	Updates SMA info
 	totalAllocatedSize += (get_blockSize(oldBlock) - get_blockSize(newBlock));
@@ -451,7 +491,7 @@ void add_block_freeList(void* block, int size) {
 			void* current_block = freeListHead;
 
 			//find block that will become self's previous
-			while (current_pos <= position_to_add_at) {
+			while (current_pos < position_to_add_at) {
 				if (current_pos == position_to_add_at - 1) {
 					previous_block = current_block;//get self's previous block
 					next_block = NEXT(current_block);//get self's next block
@@ -503,6 +543,9 @@ void add_block_freeList(void* block, int size) {
  * 	Description:	Removes a memory block from the the free memory list
  */
 void remove_block_freeList(void* block) {
+	if(block == freeListHead){
+		freeListHead = 0;
+	}
 	//	TODO: 	Remove the block from the free list
 	//	Hint: 	You need to update the pointers in the free blocks before and after this block.
 	//			You also need to remove any TAG in the free block.
