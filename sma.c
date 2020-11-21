@@ -61,7 +61,8 @@ void* heap_start = 0;
  */
 
 void test() {
-	print_heap();
+	void* b = 0x777777777777;
+	int a = find_position_in_free_list(b);
 	// //test worst fit
 	// sma_malloc(1);
 	// print_heap();
@@ -168,6 +169,7 @@ void sma_free(void* ptr) {
 	else {
 		//	Adds the block to the free memory list
 		//overhead for free list is bigger so need to change properties
+		print_block(ptr);
 		add_block_freeList(ptr + (FREE_BLOCK_HEADER_SIZE - INUSE_BLOCK_HEADER_SIZE), SIZE(ptr) - (FREE_BLOCK_HEADER_SIZE - INUSE_BLOCK_HEADER_SIZE));
 	}
 }
@@ -281,6 +283,14 @@ void* allocate_pBrk(int size) {
 	int number_chunks_to_allocate = (int)ceil((double)minimum_INUSE_size / PBRK_CHUNK_ALLOCATION);
 	int allocate_size = number_chunks_to_allocate * PBRK_CHUNK_ALLOCATION;
 
+	// //get last free block
+	// void* last_block;
+	// while (last_block) {
+	// 	if (NEXT(last_block))
+	// 		last_block = NEXT(last_block);
+	// }
+	// allocate_size = ;
+
 	newBlock = sbrk(allocate_size); //get previous pbrk location and request chunks of memory
 	if (heap_start == 0)
 		heap_start = newBlock;
@@ -331,6 +341,7 @@ void* allocate_worst_fit(int size) {
 	void* worstBlock = NULL;
 	int excessLength = 0;
 	void* current_block = freeListHead; //start iteration by the head
+	void* new_block_insert_at = 0;
 
 	while (current_block) {//check if theres a next block
 		if (SIZE(current_block) + FREE_OVERHEAD >= size) {//check if big enough
@@ -344,7 +355,7 @@ void* allocate_worst_fit(int size) {
 
 	//	Checks if appropriate block is found.
 	if (worstBlock) {
-		void* new_block_insert_at = worstBlock - (FREE_OVERHEAD - INUSE_OVERHEAD);
+		new_block_insert_at = worstBlock - (FREE_OVERHEAD - INUSE_OVERHEAD);
 		//assumes allocate_freeList already took care of adding space for the free block header so size of new block is size
 		excessLength = SIZE(worstBlock) + FREE_OVERHEAD - size - INUSE_OVERHEAD;
 
@@ -353,10 +364,10 @@ void* allocate_worst_fit(int size) {
 	}
 	else {
 		//	Assigns invalid address if appropriate block not found in free list
-		worstBlock = (void*)-2;
+		new_block_insert_at = (void*)-2;
 	}
 
-	return worstBlock;
+	return new_block_insert_at;
 }
 
 /*
@@ -508,13 +519,15 @@ void add_block_freeList(void* block, int size) {
 		}
 	}
 
-	merge(PREVIOUS(block), block);
 	merge(block, NEXT(block));
+	merge(PREVIOUS(block), block);
+
 	//cant reuse block variable after merging
 
 
 	/* Clean memory if top is free and larger than MAX_TOP_FREE */
 	void* current_block = freeListHead;
+	int number_of_blocks = 0;
 	while (current_block) {
 		if (!NEXT(current_block)) {//check if current block is the last block
 			if ((SIZE(current_block) + FREE_OVERHEAD) >= MAX_TOP_FREE) {//check if too big
@@ -529,6 +542,7 @@ void add_block_freeList(void* block, int size) {
 			}
 		}
 		current_block = NEXT(current_block);
+		number_of_blocks++;
 	}
 
 	//	Updates SMA info
@@ -543,7 +557,7 @@ void add_block_freeList(void* block, int size) {
  * 	Description:	Removes a memory block from the the free memory list
  */
 void remove_block_freeList(void* block) {
-	if(block == freeListHead){
+	if (block == freeListHead) {
 		freeListHead = 0;
 	}
 	//	TODO: 	Remove the block from the free list
