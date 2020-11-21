@@ -37,7 +37,7 @@
 #define INUSE_OVERHEAD (INUSE_BLOCK_HEADER_SIZE + 2 * BLOCK_TAG_SIZE) //Memory overhead for INUSE block
 #define FREE_OVERHEAD (FREE_BLOCK_HEADER_SIZE + 2 * BLOCK_TAG_SIZE)//Memory overhead for FREE block
 #define MIN_EXCESS_SIZE (1024 - INUSE_OVERHEAD) //Minimum excess size for split. 
-#define PBRK_CHUNK_ALLOCATION (16 * 1024)//size of chunk pbrk allocates
+#define PBRK_CHUNK_ALLOCATION (2 * 1024)//size of chunk pbrk allocates
 
 typedef enum //	Policy type definition
 {
@@ -61,8 +61,10 @@ void* heap_start = 0;
  */
 
 void test() {
-	void* b = 0x777777777777;
-	int a = find_position_in_free_list(b);
+
+	sma_malloc(1);
+	sma_malloc(3 * 1024);
+
 	// //test worst fit
 	// sma_malloc(1);
 	// print_heap();
@@ -277,19 +279,24 @@ void* sma_realloc(void* ptr, int size) {
 void* allocate_pBrk(int size) {
 	void* newBlock = NULL;
 	int excessLength;
+	int partial_free_block = 0;
 
 	//calculate number of chunks to request
 	int minimum_INUSE_size = size + FREE_OVERHEAD;
 	int number_chunks_to_allocate = (int)ceil((double)minimum_INUSE_size / PBRK_CHUNK_ALLOCATION);
 	int allocate_size = number_chunks_to_allocate * PBRK_CHUNK_ALLOCATION;
-
-	// //get last free block
-	// void* last_block;
-	// while (last_block) {
-	// 	if (NEXT(last_block))
-	// 		last_block = NEXT(last_block);
-	// }
-	// allocate_size = ;
+	/**
+	//get last free block
+	void* last_block = freeListHead;
+	while (last_block) {
+		if (!NEXT(last_block))break;
+		last_block = NEXT(last_block);
+	}
+	if (last_block && !NEXT(last_block) && (sbrk(0) == last_block + SIZE(last_block) + BLOCK_TAG_SIZE)) {//check last block to be the last element on the heap
+		allocate_size -= SIZE(last_block);
+		partial_free_block = 1;
+	}
+	*/
 
 	newBlock = sbrk(allocate_size); //get previous pbrk location and request chunks of memory
 	if (heap_start == 0)
@@ -301,7 +308,7 @@ void* allocate_pBrk(int size) {
 	excessLength = allocate_size - (newBlock_size + INUSE_OVERHEAD);
 
 	//	Allocates the Memory Block
-	allocate_block(newBlock, newBlock_size, excessLength, 0);
+	allocate_block(newBlock, newBlock_size, excessLength, partial_free_block);
 
 	return newBlock;
 }

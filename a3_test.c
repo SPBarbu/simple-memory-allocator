@@ -33,23 +33,28 @@ int main(int argc, char* argv[]) {
 	int* c2[32];
 	char str[60];
 
+	int a;
 	// Test 1: Find the holes
 	puts("Test 1: Excess Memory Allocation...");
 
 	// Allocating 32 kbytes of memory..
-	for (i = 0; i < 32; i++) 	{
+	for (i = 0; i < 32; i++) {
 		c[i] = (char*)sma_malloc(1024);
+		a = get_largest_freeBlock();
 		// sprintf(str, "c[i]: %p", c[i]);
 		// puts(str);
 	}
-
 	// Now deallocating some of the slots ..to free
-	for (i = 10; i < 18; i++) 	{
+	for (i = 10; i < 18; i++) {
+		if (i == 17) {
+			puts("");
+		}
 		sma_free(c[i]);
+		a = get_largest_freeBlock();
 		// sprintf(str, "Freeing c[i]: %p", c[i]);
 		// puts(str);
 	}
-
+	test();
 	// Allocate some storage .. this should go into the freed storage
 	ct = (char*)sma_malloc(5 * 1024);
 	// sprintf(str, "CT : %p", ct);
@@ -65,7 +70,7 @@ int main(int argc, char* argv[]) {
 	puts("Test 2: Program break expansion test...");
 
 	count = 0;
-	for (i = 1; i < 40; i++) 	{
+	for (i = 1; i < 40; i++) {
 		limitbefore = sbrk(0);
 		ptr = sma_malloc(1024 * 32 * i);
 		limitafter = sbrk(0);
@@ -86,16 +91,24 @@ int main(int argc, char* argv[]) {
 	sma_mallopt(WORST_FIT);
 
 	// Allocating 512 kbytes of memory..
-	for (i = 0; i < 32; i++)
+	for (i = 0; i < 32; i++) {
 		c2[i] = (int*)sma_malloc(16 * 1024);
+		a = get_largest_freeBlock();
+	}
 
+	a = get_largest_freeBlock();
 	// Now deallocating some of the slots ..to free
 	// One chunk of 5x16 kbytes
 	sma_free(c2[31]);
+	a = get_largest_freeBlock();
 	sma_free(c2[30]);
+	a = get_largest_freeBlock();
 	sma_free(c2[29]);
+	a = get_largest_freeBlock();
 	sma_free(c2[28]);
+	a = get_largest_freeBlock();
 	sma_free(c2[27]);
+	a = get_largest_freeBlock();
 
 	// One chunk of 3x16 kbytes
 	sma_free(c2[25]);
@@ -118,13 +131,13 @@ int main(int argc, char* argv[]) {
 	int* cp2 = (int*)sma_malloc(16 * 1024 * 2);
 
 	// Testing if the correct hole has been allocated
-	if (cp2 != NULL) 	{
+	if (cp2 != NULL) {
 		if (cp2 == c2[27] || cp2 == c2[28] || cp2 == c2[29] || cp2 == c2[30])
 			puts("\t\t\t\t PASSED\n");
 		else
 			puts("\t\t\t\t FAILED\n");
 	}
-	else 	{
+	else {
 		puts("\t\t\t\t FAILED\n");
 	}
 
@@ -140,19 +153,19 @@ int main(int argc, char* argv[]) {
 	int* cp4 = (int*)sma_malloc(16 * 1024 * 2);
 
 	// Testing if the correct holes have been allocated
-	if (cp3 == c2[8] && cp3 != NULL) 	{
-		if (cp4 == c2[19]) 		{
+	if (cp3 == c2[8] && cp3 != NULL) {
+		if (cp4 == c2[19]) {
 			// sprintf(str, "C[19]: %p", c[19]);
 			// puts(str);
 			// sprintf(str, "CP4: %p", cp4);
 			// puts(str);
 			puts("\t\t\t\t PASSED\n");
 		}
-		else 		{
+		else {
 			puts("\t\t\t\t FAILED\n");
 		}
 	}
-	else 	{
+	else {
 		puts("\t\t\t\t FAILED\n");
 	}
 
@@ -167,7 +180,7 @@ int main(int argc, char* argv[]) {
 	cp3 = (int*)sma_realloc(cp3, 16 * 1024 * 5);
 	cp4 = (int*)sma_realloc(cp4, 16 * 1024 * 3);
 
-	if (cp3 == c2[27] && cp3 != NULL && cp4 == c2[8] && cp4 != NULL) 	{
+	if (cp3 == c2[27] && cp3 != NULL && cp4 == c2[8] && cp4 != NULL) {
 		//	Test the Data stored in the memory blocks
 		if (*cp3 == 427 && *cp4 == 310) {
 			puts("\t\t\t\t PASSED\n");
@@ -176,7 +189,7 @@ int main(int argc, char* argv[]) {
 			puts("\t\t\t\t FAILED\n");
 		}
 	}
-	else 	{
+	else {
 		puts("\t\t\t\t FAILED\n");
 	}
 
