@@ -37,7 +37,7 @@
 #define INUSE_OVERHEAD (INUSE_BLOCK_HEADER_SIZE + 2 * BLOCK_TAG_SIZE) //Memory overhead for INUSE block
 #define FREE_OVERHEAD (FREE_BLOCK_HEADER_SIZE + 2 * BLOCK_TAG_SIZE)//Memory overhead for FREE block
 #define MIN_EXCESS_SIZE (1024 - INUSE_OVERHEAD) //Minimum excess size for split. 
-#define PBRK_CHUNK_ALLOCATION (2 * 1024)//size of chunk pbrk allocates
+#define PBRK_CHUNK_ALLOCATION (16 * 1024)//size of chunk pbrk allocates
 
 typedef enum //	Policy type definition
 {
@@ -47,12 +47,13 @@ typedef enum //	Policy type definition
 
 char* sma_malloc_error;
 void* freeListHead = NULL;			  //	The pointer to the HEAD of the doubly linked free memory list
-void* startNextSearch = NULL; //Block on which to start next-fit algorithm
+void* last_allocated = 0; //memory that was last allocated to the user
 unsigned long totalAllocatedSize = 0; //	Total Allocated memory in Bytes
 unsigned long totalFreeSize = 0;	  //	Total Free memory in Bytes in the free memory list
 Policy currentPolicy = WORST;		  //	Current Policy
 void* reallocating = 0;	//indicates to allocate_free_list to start searching where previous ptr was allocated
 void* heap_start = 0;
+int requesting = 0;
 
 /*
  * =====================================================================================
@@ -61,9 +62,20 @@ void* heap_start = 0;
  */
 
 void test() {
+	sma_mallinfo();
 
-	sma_malloc(1);
-	sma_malloc(3 * 1024);
+	// // test get_size_free_top
+	// heap_start = sbrk(71);
+	// void* heap_end = sbrk(0);
+	// void* b1 = heap_start + 21;
+	// add_block_freeList(b1, 1);
+	// b1 += 24;
+	// add_block_freeList(b1, 1);
+	// b1 += 24;
+	// add_block_freeList(b1, 1);
+	// // int a = get_size_free_block_top_heap();
+	// print_heap();
+	// allocate_pBrk(1);
 
 	// //test worst fit
 	// sma_malloc(1);
@@ -124,7 +136,6 @@ void test() {
  */
 void* sma_malloc(int size) {
 	void* pMemory = NULL;
-
 	// Checks if the free list is empty
 	if (freeListHead == NULL) {
 		// Allocate memory by increasing the Program Break
@@ -277,40 +288,52 @@ void* sma_realloc(void* ptr, int size) {
   * 	Description:	Allocates memory by increasing the Program Break
   */
 void* allocate_pBrk(int size) {
-	void* newBlock = NULL;
-	int excessLength;
-	int partial_free_block = 0;
+	if (!heap_start) heap_start = sbrk(0);
+	void* free_block_top_heap = get_free_block_top_heap();
+	int length_free_block_top_head = (free_block_top_heap ? SIZE(free_block_top_heap) + FREE_OVERHEAD : 0);//if there is a free block at the top of the heap, get its length
+	int for_request_size = size + (FREE_OVERHEAD - INUSE_OVERHEAD);
+	int number_chunks_to_fill_request = (int)(ceil((double)for_request_size / PBRK_CHUNK_ALLOCATION));
+	int length_chunks_to_fill_request = number_chunks_to_fill_request * PBRK_CHUNK_ALLOCATION;
+	int extra_length_need_to_fill_request = length_chunks_to_fill_request - length_free_block_top_head;
 
-	//calculate number of chunks to request
-	int minimum_INUSE_size = size + FREE_OVERHEAD;
-	int number_chunks_to_allocate = (int)ceil((double)minimum_INUSE_size / PBRK_CHUNK_ALLOCATION);
-	int allocate_size = number_chunks_to_allocate * PBRK_CHUNK_ALLOCATION;
-	/**
-	//get last free block
-	void* last_block = freeListHead;
-	while (last_block) {
-		if (!NEXT(last_block))break;
-		last_block = NEXT(last_block);
+	void* new_block_insert_at;
+	int excess_length;
+
+	if (free_block_top_heap) {
+		sbrk(extra_length_need_to_fill_request);
+		void* excess_block_start = free_block_top_heap + SIZE(free_block_top_heap) + BLOCK_TAG_SIZE + BLOCK_TAG_SIZE + FREE_BLOCK_HEADER_SIZE;
+		int excess_block_size = extra_length_need_to_fill_request - FREE_OVERHEAD;
+		requesting = 1;
+		add_block_freeList(excess_block_start, excess_block_size);
+		requesting = 0;
+
+		new_block_insert_at = free_block_top_heap - (FREE_OVERHEAD - INUSE_OVERHEAD);
+		excess_length = SIZE(free_block_top_heap) /* has new size b/c it merged*/ + FREE_OVERHEAD - for_request_size - INUSE_OVERHEAD;
+		allocate_block(new_block_insert_at, for_request_size, excess_length, 1);
+
 	}
-	if (last_block && !NEXT(last_block) && (sbrk(0) == last_block + SIZE(last_block) + BLOCK_TAG_SIZE)) {//check last block to be the last element on the heap
-		allocate_size -= SIZE(last_block);
-		partial_free_block = 1;
+	else {
+		new_block_insert_at = sbrk(extra_length_need_to_fill_request) + BLOCK_TAG_SIZE + INUSE_BLOCK_HEADER_SIZE;
+		excess_length = extra_length_need_to_fill_request - for_request_size - INUSE_OVERHEAD;
+		allocate_block(new_block_insert_at, for_request_size, excess_length, 0);
+
 	}
-	*/
 
-	newBlock = sbrk(allocate_size); //get previous pbrk location and request chunks of memory
-	if (heap_start == 0)
-		heap_start = newBlock;
-	newBlock += BLOCK_TAG_SIZE + INUSE_BLOCK_HEADER_SIZE;//points to begining of data
+	// return newBlock;
+	return new_block_insert_at;
+}
 
-	int newBlock_size = size + FREE_OVERHEAD - INUSE_OVERHEAD; // adding free overhead rather than just inuse overhead so can convert to free when needed b/c free overhead is move than inuse overhead
-
-	excessLength = allocate_size - (newBlock_size + INUSE_OVERHEAD);
-
-	//	Allocates the Memory Block
-	allocate_block(newBlock, newBlock_size, excessLength, partial_free_block);
-
-	return newBlock;
+void* get_free_block_top_heap() {
+	void* current_block = freeListHead;
+	//iterate through all the blocks in the free list
+	while (current_block) {
+		if (!NEXT(current_block))break;//dont increment once found
+		current_block = NEXT(current_block);
+	}
+	if (current_block && (current_block + SIZE(current_block) + BLOCK_TAG_SIZE) == sbrk(0)) {//check theres no INUSE memory after that free block
+		return current_block;
+	}
+	return 0;
 }
 
 /*
@@ -530,31 +553,37 @@ void add_block_freeList(void* block, int size) {
 	merge(PREVIOUS(block), block);
 
 	//cant reuse block variable after merging
+	clean_memory();
 
 
-	/* Clean memory if top is free and larger than MAX_TOP_FREE */
-	void* current_block = freeListHead;
-	int number_of_blocks = 0;
-	while (current_block) {
-		if (!NEXT(current_block)) {//check if current block is the last block
-			if ((SIZE(current_block) + FREE_OVERHEAD) >= MAX_TOP_FREE) {//check if too big
-				if (current_block == freeListHead) {
-					freeListHead = 0;
-				}
-				else {
-					NEXT(PREVIOUS(current_block)) = 0; //make previous block the last block
-				}
-				sbrk(-((int)((SIZE(current_block) + FREE_OVERHEAD) / 2)));
-				add_block_freeList(current_block, SIZE(current_block) - ((int)((SIZE(current_block) + FREE_OVERHEAD) / 2)));
-			}
-		}
-		current_block = NEXT(current_block);
-		number_of_blocks++;
-	}
 
 	//	Updates SMA info
 	totalAllocatedSize -= get_blockSize(block);
 	totalFreeSize += get_blockSize(block);
+}
+
+void clean_memory() {
+	/* Clean memory if top is free and larger than MAX_TOP_FREE */
+	void* current_block = freeListHead;
+	int number_of_blocks = 0;//just for debugging purposes
+	if (!requesting && !reallocating) {//to avoid cleaning memory when some chunk of it is required at some other place
+		while (current_block) {
+			if (!NEXT(current_block)) {//check if current block is the last block
+				if ((SIZE(current_block) + FREE_OVERHEAD) >= MAX_TOP_FREE) {//check if too big
+					if (current_block == freeListHead) {
+						freeListHead = 0;
+					}
+					else {
+						NEXT(PREVIOUS(current_block)) = 0; //make previous block the last block
+					}
+					sbrk(-((int)((SIZE(current_block) + FREE_OVERHEAD) / 2)));
+					add_block_freeList(current_block, SIZE(current_block) - ((int)((SIZE(current_block) + FREE_OVERHEAD) / 2)));
+				}
+			}
+			current_block = NEXT(current_block);
+			number_of_blocks++;
+		}
+	}
 }
 
 /*

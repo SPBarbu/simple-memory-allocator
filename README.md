@@ -1,4 +1,6 @@
-For the grader: Regarding the runtime errors of misaligned memory accessing; Professor Maheswaran confirmed with me that it should not be penalized.
+For the grader: 
+For the NEXT-FIT allocation, I assume that changing the memory allocation policy resets the last allocated memory to the start of the heap. This is because in the test file, before test 4, the last allocated memory was cp2 at c2[27] so the next-fit algorithm should have allocated at c2[29] where there were 3*16kB free, yet test4 expects cp3 to be allocated at c2[8]. Not resetting the last allocated memory after the policy has been changed could lead to having the last allocated memory pointer in the middle of some other allocated block's memory.
+Regarding the runtime errors of misaligned memory accessing; Professor Maheswaran confirmed with me by email that it should not be penalized.
 
 
 |type|size|relative position
@@ -21,6 +23,6 @@ A block's "start" ie what previous & next point to is the data's first memory lo
 The linked list for the free blocks maintains the blocks by increasing memory position. IE, the first block is the lowest on the heap and the last, the highest on the heap.
 Made this decision of preserving free blocks in order after implementing the tags in the blocks. The tags are useless if the ordering can be preserved. Possibly remove so it doesn't cause misalignment anymore, but not critical.
 
-To minimize external fragmentation, a contiguous block is split only if the unused block is at least 1024 bytes + FREE_BLOCK_HEADER_SIZE + 2 * BLOCK_TAG_SIZE in length, ie it can fit one 1024 bytes block + the overhead.
+To minimize external fragmentation, a contiguous block is split only if the unused block is at least 1024 bytes + FREE_BLOCK_HEADER_SIZE + 2 * BLOCK_TAG_SIZE in length, ie it can fit one 1024 bytes block + the overhead. If the excess is less than that, there is internal fragmentation.
 
-Undefined behavior when calling sma_free on a modified pointer than the one returned by sma_malloc or sma_realloc.
+Undefined behavior when calling sma_free and sma_realloc on a modified pointer than the one returned by sma_malloc or sma_realloc.

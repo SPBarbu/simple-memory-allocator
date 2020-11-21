@@ -55,3 +55,5 @@ static void print_block(void* block);
 static void merge(void* bottom_block, void* top_block);
 static void print_heap();
 static int find_position_in_free_list(void* block);
+static void* get_free_block_top_heap();
+static void clean_memory();
