@@ -36,8 +36,8 @@
 #define BLOCK_TAG_SIZE (sizeof(char)) // Size of a INUSE/FREE tag. Expect to use 2 at the start and end of a block
 #define INUSE_OVERHEAD (INUSE_BLOCK_HEADER_SIZE + 2 * BLOCK_TAG_SIZE) //Memory overhead for INUSE block
 #define FREE_OVERHEAD (FREE_BLOCK_HEADER_SIZE + 2 * BLOCK_TAG_SIZE)//Memory overhead for FREE block
-#define MIN_EXCESS_SIZE (INUSE_OVERHEAD + 1024) //Minimum excess size for split. 
-#define PBRK_CHUNK_ALLOCATION (64 * 1024)//size of chunk pbrk allocates
+#define MIN_EXCESS_SIZE (INUSE_OVERHEAD + 32) //Minimum excess size for split. 
+#define PBRK_CHUNK_ALLOCATION (128)//size of chunk pbrk allocates
 
 typedef enum //	Policy type definition
 {
@@ -52,6 +52,7 @@ unsigned long totalAllocatedSize = 0; //	Total Allocated memory in Bytes
 unsigned long totalFreeSize = 0;	  //	Total Free memory in Bytes in the free memory list
 Policy currentPolicy = WORST;		  //	Current Policy
 void* reallocating = 0;	//indicates to allocate_free_list to start searching where previous ptr was allocated
+void* heap_start = 0;
 
 /*
  * =====================================================================================
@@ -60,6 +61,14 @@ void* reallocating = 0;	//indicates to allocate_free_list to start searching whe
  */
 
 void test() {
+
+	//test worst fit
+	heap_start = sbrk(0);
+	void* b0 = sbrk(128) + 21;
+	add_block_freeList(b0, 128 - FREE_OVERHEAD);
+	void* b1 = allocate_worst_fit(1);
+
+
 	/*// test clean memory
 	void* block1 = sbrk(128) + 21;
 	add_block_freeList(block1, 128 - FREE_OVERHEAD);
@@ -67,16 +76,6 @@ void test() {
 	void* block2 = block1 + SIZE(block1) + BLOCK_TAG_SIZE + BLOCK_TAG_SIZE + FREE_BLOCK_HEADER_SIZE;
 	add_block_freeList(block2, 128 - FREE_OVERHEAD);
 	*/
-
-	void* block1 = sbrk(128) + 21;
-	write_block(block1, 1, 0, 0, 15);
-	for (int i = 0; i < SIZE(block1); i++) {
-		*(char*)(block1 + i) = i + 1;
-	}
-	hex_dump(block1, 37);
-	sma_realloc(block1, 1);
-
-
 
 	// test add block free list
 	// void* block = sbrk(1024) + 21;
@@ -114,7 +113,6 @@ void* sma_malloc(int size) {
 			pMemory = allocate_pBrk(size);
 		}
 	}//TODO support if top of free list is free but not big enough to fit size
-
 	// Validates memory allocation
 	if (pMemory < 0 || pMemory == NULL) {
 		sma_malloc_error = "Error: Memory allocation failed!";
@@ -259,6 +257,8 @@ void* allocate_pBrk(int size) {
 	int allocate_size = number_chunks_to_allocate * PBRK_CHUNK_ALLOCATION;
 
 	newBlock = sbrk(allocate_size); //get previous pbrk location and request chunks of memory
+	if (heap_start = 0)
+		heap_start = newBlock;
 	newBlock += BLOCK_TAG_SIZE + INUSE_BLOCK_HEADER_SIZE;//points to begining of data
 
 	int newBlock_size = size + FREE_OVERHEAD - INUSE_OVERHEAD; // adding free overhead rather than just inuse overhead so can convert to free when needed b/c free overhead is move than inuse overhead
@@ -413,8 +413,6 @@ void replace_block_freeList(void* oldBlock, void* newBlock) {
  * 	Output type:	void
  * 	Description:	Adds a memory block to the the free memory list
  */
- //TODO MERGE adjacent free cells
- //TODO heap if top is free and larger than MAX_TOP_FREE
 void add_block_freeList(void* block, int size) {
 	void* previous_block;
 	void* next_block;
@@ -462,29 +460,20 @@ void add_block_freeList(void* block, int size) {
 
 
 	/* Clean memory if top is free and larger than MAX_TOP_FREE */
-	if (!reallocating) { // dont clean memory if reallocating
-		void* current_block = block;
-		if (!NEXT(current_block)) {//check if current block is the last block
-			if ((SIZE(current_block) + FREE_OVERHEAD) >= MAX_TOP_FREE) {//check if too big
-				if (current_block == freeListHead) {
-					freeListHead = 0;
-				}
-				else {
-					NEXT(PREVIOUS(current_block)) = 0; //make previous block the last block
-				}
-				sbrk((int)((SIZE(current_block) + FREE_OVERHEAD) / 2));//reduce free memory in half
-				add_block_freeList(current_block, ((int)(MAX_TOP_FREE / 2) - FREE_OVERHEAD));//rewrite and add to the free list the block but with half size
+	//if(!reallocating) { // dont clean memory if reallocating
+	void* current_block = block;
+	if (!NEXT(current_block)) {//check if current block is the last block
+		if ((SIZE(current_block) + FREE_OVERHEAD) >= MAX_TOP_FREE) {//check if too big
+			if (current_block == freeListHead) {
+				freeListHead = 0;
 			}
+			else {
+				NEXT(PREVIOUS(current_block)) = 0; //make previous block the last block
+			}
+			sbrk(-((int)((SIZE(current_block) + FREE_OVERHEAD) / 2)));//reduce free memory in half
+			add_block_freeList(current_block, ((int)(MAX_TOP_FREE / 2) - FREE_OVERHEAD));//rewrite and add to the free list the block but with half size
 		}
 	}
-
-
-	//	TODO: 	Add the block to the free list
-	//	Hint: 	You could add the free block at the end of the list, but need to check if there
-	//			exits a list. You need to add the TAG to the list.
-	//			Also, you would need to check if merging with the "adjacent" blocks is possible or not.
-	//			Merging would be tideous. Check adjacent blocks, then also check if the merged
-	//			block is at the top and is bigger than the largest free block allowed (128kB).
 
 	//	Updates SMA info
 	totalAllocatedSize -= get_blockSize(block);
@@ -541,7 +530,7 @@ int get_largest_freeBlock() {
  */
 void merge(void* bottom_block, void* top_block) {
 	if (!bottom_block || !top_block) return;//if any is empty, merged
-	if (TYPE(bottom_block) != 2 || TYPE(top_block) != 2) return;//if any isn't a FREE block
+	if (TYPE(bottom_block) != 0 || TYPE(top_block) != 0) return;//if any isn't a FREE block
 	if ((bottom_block + SIZE(bottom_block) + BLOCK_TAG_SIZE) != (top_block - FREE_BLOCK_HEADER_SIZE - BLOCK_TAG_SIZE))return; //if not contiguous memory
 
 	void* previous_block = PREVIOUS(bottom_block);
@@ -572,22 +561,43 @@ void write_block(void* block, int type, void* previous, void* next, int size) {
 		print_block(block);
 	}
 	else if (type == 0) {//FREE block
-		*(char*)(block - FREE_BLOCK_HEADER_SIZE - BLOCK_TAG_SIZE) = 2;//head tag
+		*(char*)(block - FREE_BLOCK_HEADER_SIZE - BLOCK_TAG_SIZE) = 0;//head tag
 		*(int*)(block - sizeof(int)) = size;//length register
 		*(void**)(block - sizeof(int) - sizeof(void*)) = next;//next register//TOTEST
 		*(void**)(block - sizeof(int) - sizeof(void*) - sizeof(void*)) = previous;//previous register//TOTEST
-		*(char*)(block + size) = 2;//foot tag
+		*(char*)(block + size) = 0;//foot tag
 		print_block(block);
 	}
+	memset(block, 0, SIZE(block));
+}
+
+void print_heap() {
+	void* heap = sbrk(0);
+	hex_dump(heap_start, (int)(heap - heap_start));
 }
 
 void print_block(void* block) {
 	// return;
+
 	if (TYPE(block) == 1) {//INUSE block
-		hex_dump(block - INUSE_BLOCK_HEADER_SIZE - BLOCK_TAG_SIZE, SIZE(block) + INUSE_OVERHEAD);
+		if (SIZE(block) < 64) {
+			puts("f");
+			hex_dump(block - INUSE_BLOCK_HEADER_SIZE - BLOCK_TAG_SIZE, SIZE(block) + INUSE_OVERHEAD);
+		}
+		else {
+			puts("t");
+			hex_dump(block - INUSE_BLOCK_HEADER_SIZE - BLOCK_TAG_SIZE, INUSE_BLOCK_HEADER_SIZE);
+		}
 	}
-	else if (TYPE(block) == 2) {//FREE block
-		hex_dump(block - FREE_BLOCK_HEADER_SIZE - BLOCK_TAG_SIZE, SIZE(block) + FREE_OVERHEAD);
+	else if (TYPE(block) == 0) {//FREE block
+		if (SIZE(block) < 64) {
+			puts("f");
+			hex_dump(block - FREE_BLOCK_HEADER_SIZE - BLOCK_TAG_SIZE, SIZE(block) + FREE_OVERHEAD);
+		}
+		else {
+			puts("t");
+			hex_dump(block - FREE_BLOCK_HEADER_SIZE - BLOCK_TAG_SIZE, FREE_BLOCK_HEADER_SIZE);
+		}
 	}
 }
 
