@@ -29,7 +29,7 @@
 #define TYPE(BLOCK) (*(char*)(BLOCK+SIZE(BLOCK)))
 
 /* Definitions*/
-#define MAX_TOP_FREE (128) // Max top free block size = 128 Kbytes
+#define MAX_TOP_FREE (128 * 1024) // Max top free block size = 128 Kbytes
 
 #define FREE_BLOCK_HEADER_SIZE (2*sizeof(void*) + sizeof(int)) // Size of the Header in a free memory block
 #define INUSE_BLOCK_HEADER_SIZE (sizeof(int)) // Size of the Header in a used memory block
@@ -47,10 +47,11 @@ typedef enum //	Policy type definition
 
 char* sma_malloc_error;
 void* freeListHead = NULL;			  //	The pointer to the HEAD of the doubly linked free memory list
-void* freeListTail = NULL;			  //	The pointer to the TAIL of the doubly linked free memory list
+void* startNextSearch = NULL; //Block on which to start next-fit algorithm
 unsigned long totalAllocatedSize = 0; //	Total Allocated memory in Bytes
 unsigned long totalFreeSize = 0;	  //	Total Free memory in Bytes in the free memory list
 Policy currentPolicy = WORST;		  //	Current Policy
+void* reallocating = 0;	//indicates to allocate_free_list to start searching where previous ptr was allocated
 
 /*
  * =====================================================================================
@@ -59,23 +60,22 @@ Policy currentPolicy = WORST;		  //	Current Policy
  */
 
 void test() {
-
-	// test clean memory
+	/*// test clean memory
 	void* block1 = sbrk(128) + 21;
 	add_block_freeList(block1, 128 - FREE_OVERHEAD);
 	sbrk(128);
 	void* block2 = block1 + SIZE(block1) + BLOCK_TAG_SIZE + BLOCK_TAG_SIZE + FREE_BLOCK_HEADER_SIZE;
 	add_block_freeList(block2, 128 - FREE_OVERHEAD);
+	*/
 
+	void* block1 = sbrk(128) + 21;
+	write_block(block1, 1, 0, 0, 15);
+	for (int i = 0; i < SIZE(block1); i++) {
+		*(char*)(block1 + i) = i + 1;
+	}
+	hex_dump(block1, 37);
+	sma_realloc(block1, 1);
 
-
-	void* block3 = block2 + 23;
-	add_block_freeList(block3, 1);
-	block3 += 23;
-	add_block_freeList(block3, 1);
-	block3 += 23;
-	add_block_freeList(block3, 1);
-	hex_dump(block1 - 21, 115);
 
 
 	// test add block free list
@@ -196,6 +196,38 @@ void sma_mallinfo() {
  * 					memory block according to the input size.
  */
 void* sma_realloc(void* ptr, int size) {
+	//	Checks if the ptr is NULL
+	if (ptr == NULL) {
+		puts("Error: Attempting to reallocate NULL!");
+		return 0;
+	}
+	//	Checks if the ptr is beyond Program Break
+	else if (ptr > sbrk(0)) {
+		puts("Error: Attempting to reallocate unallocated space!");
+		return 0;
+	}
+
+	//save the data
+	char data[SIZE(ptr)];
+	for (int i = 0; i < SIZE(ptr); i++) {
+		data[i] = (*(char*)(ptr + i));
+	}
+
+	//replace the data in memory where theres enough size
+	reallocating = ptr;
+	sma_free(ptr);
+	ptr = sma_malloc(size);
+	reallocating = 0;
+	if (ptr > 0) {//check if successfully malloced
+		for (int i = 0; i < sizeof(data); i++) {
+			*(char*)(ptr + i) = data[i];//copy data
+		}
+	}
+	return ptr;
+
+
+
+
 	// TODO: 	Should be similar to sma_malloc, except you need to check if the pointer address
 	//			had been previously allocated.
 	// Hint:	Check if you need to expand or contract the memory. If new size is smaller, then
@@ -428,9 +460,10 @@ void add_block_freeList(void* block, int size) {
 	merge(PREVIOUS(block), block);
 	merge(block, NEXT(block));
 
+
 	/* Clean memory if top is free and larger than MAX_TOP_FREE */
-	void* current_block = freeListHead;
-	while (current_block) {
+	if (!reallocating) { // dont clean memory if reallocating
+		void* current_block = block;
 		if (!NEXT(current_block)) {//check if current block is the last block
 			if ((SIZE(current_block) + FREE_OVERHEAD) >= MAX_TOP_FREE) {//check if too big
 				if (current_block == freeListHead) {
@@ -443,7 +476,6 @@ void add_block_freeList(void* block, int size) {
 				add_block_freeList(current_block, ((int)(MAX_TOP_FREE / 2) - FREE_OVERHEAD));//rewrite and add to the free list the block but with half size
 			}
 		}
-		current_block = NEXT(current_block);
 	}
 
 
@@ -496,14 +528,11 @@ int get_largest_freeBlock() {
 	void* current_block = freeListHead;
 
 	while (current_block != 0) {
-		// if(SIZE()){
-
-		// }
+		if (SIZE(current_block) > largestBlockSize) {
+			largestBlockSize = SIZE(current_block);//update if larger than current largest
+		}
 		current_block = NEXT(current_block);
 	}
-
-	//	TODO: Iterate through the Free Block List to find the largest free block and return its size
-
 	return largestBlockSize;
 }
 
