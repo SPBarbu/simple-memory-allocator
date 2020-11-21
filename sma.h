@@ -53,3 +53,5 @@ static void write_block(void* block, int type, void* previous, void* next, int s
 static void hex_dump(void* addr, int len);
 static void print_block(void* block);
 static void merge(void* bottom_block, void* top_block);
+static void print_heap();
+static int find_position_in_free_list(void* block);

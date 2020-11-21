@@ -29,7 +29,7 @@
 #define TYPE(BLOCK) (*(char*)(BLOCK+SIZE(BLOCK)))
 
 /* Definitions*/
-#define MAX_TOP_FREE (128 * 1024) // Max top free block size = 128 Kbytes
+#define MAX_TOP_FREE (128) // Max top free block size = 128 Kbytes
 
 #define FREE_BLOCK_HEADER_SIZE (2*sizeof(void*) + sizeof(int)) // Size of the Header in a free memory block
 #define INUSE_BLOCK_HEADER_SIZE (sizeof(int)) // Size of the Header in a used memory block
@@ -62,20 +62,20 @@ void* heap_start = 0;
 
 void test() {
 
-	//test worst fit
-	heap_start = sbrk(0);
-	void* b0 = sbrk(128) + 21;
-	add_block_freeList(b0, 128 - FREE_OVERHEAD);
-	void* b1 = allocate_worst_fit(1);
+	// //test worst fit
+	// heap_start = sbrk(0);
+	// void* b0 = sbrk(128) + 21;
+	// add_block_freeList(b0, 128 - FREE_OVERHEAD);
+	// void* b1 = allocate_worst_fit(1);
 
 
-	/*// test clean memory
+	// test clean memory
 	void* block1 = sbrk(128) + 21;
 	add_block_freeList(block1, 128 - FREE_OVERHEAD);
 	sbrk(128);
 	void* block2 = block1 + SIZE(block1) + BLOCK_TAG_SIZE + BLOCK_TAG_SIZE + FREE_BLOCK_HEADER_SIZE;
 	add_block_freeList(block2, 128 - FREE_OVERHEAD);
-	*/
+
 
 	// test add block free list
 	// void* block = sbrk(1024) + 21;
@@ -462,17 +462,17 @@ void add_block_freeList(void* block, int size) {
 	/* Clean memory if top is free and larger than MAX_TOP_FREE */
 	//if(!reallocating) { // dont clean memory if reallocating
 	void* current_block = block;
+	int current_block_size = SIZE(current_block);
 	if (!NEXT(current_block)) {//check if current block is the last block
-		if ((SIZE(current_block) + FREE_OVERHEAD) >= MAX_TOP_FREE) {//check if too big
+		if ((current_block_size + FREE_OVERHEAD) >= MAX_TOP_FREE) {//check if too big
 			if (current_block == freeListHead) {
 				freeListHead = 0;
 			}
 			else {
 				NEXT(PREVIOUS(current_block)) = 0; //make previous block the last block
 			}
-			sbrk(-((int)((SIZE(current_block) + FREE_OVERHEAD) / 2)));//reduce free memory in half
-			add_block_freeList(current_block, ((int)(MAX_TOP_FREE / 2) - FREE_OVERHEAD));//rewrite and add to the free list the block but with half size
-		}
+			sbrk(-((int)((current_block_size + FREE_OVERHEAD) / 2)));
+			add_block_freeList(current_block, current_block_size - ((int)((current_block_size + FREE_OVERHEAD) / 2)));}
 	}
 
 	//	Updates SMA info
@@ -580,7 +580,7 @@ void print_block(void* block) {
 	// return;
 
 	if (TYPE(block) == 1) {//INUSE block
-		if (SIZE(block) < 64) {
+		if (SIZE(block) < 256) {
 			puts("f");
 			hex_dump(block - INUSE_BLOCK_HEADER_SIZE - BLOCK_TAG_SIZE, SIZE(block) + INUSE_OVERHEAD);
 		}
@@ -590,7 +590,7 @@ void print_block(void* block) {
 		}
 	}
 	else if (TYPE(block) == 0) {//FREE block
-		if (SIZE(block) < 64) {
+		if (SIZE(block) < 256) {
 			puts("f");
 			hex_dump(block - FREE_BLOCK_HEADER_SIZE - BLOCK_TAG_SIZE, SIZE(block) + FREE_OVERHEAD);
 		}
