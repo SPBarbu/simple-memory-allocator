@@ -36,6 +36,20 @@ Number of free holes on the heap: 5
 --------------------------------------------------------------------------------------------
 Personnal design decisions, I don't know if relevant:
 
+FREE block structure:
+char tag = '0'
+data
+int length
+void* next
+void* previous
+char tag = '0'
+
+INUSE block structure:
+char tag = '1'
+data
+int length
+char tag = '1'
+
 A block's "start" ie what previous & next point to is the data's first memory location.
 
 ~~The linked list for the free blocks maintains the blocks by increasing memory position. IE, the first block is the lowest on the heap and the last, the highest on the heap.
