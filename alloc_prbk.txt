@@ -1,0 +1,36 @@
+void* allocate_pBrk(int size) {
+	void* newBlock = NULL;
+	int excessLength = 0;
+	int partial_free_block = 0;
+
+	//calculate number of chunks to request
+	int minimum_INUSE_size = size + FREE_OVERHEAD;
+	int number_chunks_to_allocate = (int)ceil((double)minimum_INUSE_size / PBRK_CHUNK_ALLOCATION);
+	int allocate_size = number_chunks_to_allocate * PBRK_CHUNK_ALLOCATION;
+	/**
+	//get last free block
+	void* last_block = freeListHead;
+	while (last_block) {
+		if (!NEXT(last_block))break;
+		last_block = NEXT(last_block);
+	}
+	if (last_block && !NEXT(last_block) && (sbrk(0) == last_block + SIZE(last_block) + BLOCK_TAG_SIZE)) {//check last block to be the last element on the heap
+		allocate_size -= SIZE(last_block);
+		partial_free_block = 1;
+	}
+	*/
+
+	newBlock = sbrk(allocate_size); //get previous pbrk location and request chunks of memory
+	if (heap_start == 0)
+		heap_start = newBlock;
+	newBlock += BLOCK_TAG_SIZE + INUSE_BLOCK_HEADER_SIZE;//points to begining of data
+
+	int newBlock_size = size + FREE_OVERHEAD - INUSE_OVERHEAD; // adding free overhead rather than just inuse overhead so can convert to free when needed b/c free overhead is move than inuse overhead
+
+	excessLength = allocate_size - (newBlock_size + INUSE_OVERHEAD);
+
+	//	Allocates the Memory Block
+	allocate_block(newBlock, newBlock_size, excessLength, partial_free_block);
+
+	return newBlock;
+}
