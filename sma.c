@@ -159,7 +159,7 @@ void sma_mallinfo() {
 	puts(str);
 	sprintf(str, "Total number of bytes of free space: %lu", total_bytes_free_includes_overhead);
 	puts(str);
-	sprintf(str, "Size of the largest contigious free space (in bytes): %d", largestFreeBlock);
+	sprintf(str, "Size of the largest contiguous free space (in bytes): %d", largestFreeBlock);
 	puts(str);
 	sprintf(str, "Size of the block at the top of the heap, if any: %d", SIZE(get_free_block_top_heap()));
 	puts(str);
