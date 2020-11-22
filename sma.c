@@ -65,26 +65,38 @@ int requesting = 0;//indicator for memory cleaning when pbrk expending
  */
 
 void test() {
-	heap_start = sbrk(256);
-	void* INUSE = heap_start + 5;
-	write_block(INUSE, 1, 0, 0, 17);
-	void* FREE = INUSE + 17 + 1 + 21;
-	add_block_freeList(FREE, 1);
-	INUSE = FREE + 1 + 1 + 1 + 4;
-	write_block(INUSE, 1, 0, 0, 17);
-	FREE = INUSE + 17 + 1 + 21;
-	add_block_freeList(FREE, 2);
-	INUSE = FREE + 2 + 1 + 1 + 4;
-	write_block(INUSE, 1, 0, 0, 17);
-	FREE = INUSE + 17 + 1 + 21;
-	add_block_freeList(FREE, 1);
-	print_heap();
 
-	sma_mallopt(2);
-	sma_malloc(2);
-	print_heap();
 	sma_malloc(1);
-	print_heap();
+	sma_mallinfo();
+	sma_malloc(1);
+	sma_mallinfo();
+	void* a = sma_malloc(1);
+	sma_mallinfo();
+	sma_free(a);
+	sma_mallinfo();
+
+
+	//test NEXT-FIT
+	// heap_start = sbrk(256);
+	// void* INUSE = heap_start + 5;
+	// write_block(INUSE, 1, 0, 0, 17);
+	// void* FREE = INUSE + 17 + 1 + 21;
+	// add_block_freeList(FREE, 1);
+	// INUSE = FREE + 1 + 1 + 1 + 4;
+	// write_block(INUSE, 1, 0, 0, 17);
+	// FREE = INUSE + 17 + 1 + 21;
+	// add_block_freeList(FREE, 2);
+	// INUSE = FREE + 2 + 1 + 1 + 4;
+	// write_block(INUSE, 1, 0, 0, 17);
+	// FREE = INUSE + 17 + 1 + 21;
+	// add_block_freeList(FREE, 1);
+	// print_heap();
+
+	// sma_mallopt(2);
+	// sma_malloc(2);
+	// print_heap();
+	// sma_malloc(1);
+	// print_heap();
 
 
 	// // test get_size_free_top
@@ -235,15 +247,15 @@ void sma_mallopt(int policy) {
 void sma_mallinfo() {
 	//	Finds the largest Contiguous Free Space (should be the largest free block)
 	int largestFreeBlock = get_largest_freeBlock();
-	char str[60];
+	char str[80];
 
-	//	Prints the SMA Stats
-	sprintf(str, "Total number of bytes allocated for data: %lu", totalAllocatedSize);
+	update_stats();
+
+	sprintf(str, "Total number of bytes allocated not including overhead: %lu", total_bytes_allocated_data);
 	puts(str);
-	//TODO
-	// sprintf(str, "Total number of bytes allocated including overhead: %lu", totalAllocatedSize);
-	// puts(str);
-	sprintf(str, "Total free space: %lu", totalFreeSize);
+	sprintf(str, "Total number of bytes allocated including overhead: %lu", total_bytes_allocated_data + total_bytes_allocated_overhead);
+	puts(str);
+	sprintf(str, "Total free space: %lu", total_bytes_free_includes_overhead);
 	puts(str);
 	sprintf(str, "Size of largest contigious free space (in bytes): %d", largestFreeBlock);
 	puts(str);
@@ -878,4 +890,52 @@ void hex_dump(void* addr, int len) {
 	// And print the final ASCII bit.
 	sprintf(str, "  %s\n", buff);
 	fputs(str, stdout);
+}
+/*
+ * Traverse every single block, INUSE and FREE to compute the stats
+ *
+ */
+void update_stats() {
+	void* current_block;
+	total_bytes_allocated_data = 0;
+	total_bytes_allocated_overhead = 0;
+	total_bytes_free_includes_overhead = 0;
+
+	if (heap_start) {//make sure dont call get_stats before allocating something
+		if (*(char*)heap_start == 1) {//first block is inuse
+			current_block = heap_start + BLOCK_TAG_SIZE + INUSE_BLOCK_HEADER_SIZE;
+		}
+		else {//first block is free
+			current_block = heap_start + BLOCK_TAG_SIZE + FREE_BLOCK_HEADER_SIZE;
+		}
+	}
+	else {
+		return;
+	}
+
+
+	while (current_block) {
+		/*compute stats for current block*/
+		if (TYPE(current_block) == 1) {//INUSE block
+			total_bytes_allocated_data += SIZE(current_block);
+			total_bytes_allocated_overhead += INUSE_OVERHEAD;
+		}
+		else {
+			total_bytes_free_includes_overhead += SIZE(current_block) + FREE_OVERHEAD;
+		}
+
+		/*got to the next block*/
+		if (current_block + SIZE(current_block) + BLOCK_TAG_SIZE == sbrk(0)) {//we've computed all the blocks
+			break;
+		}
+		else {
+			if (*(char*)(current_block + SIZE(current_block) + BLOCK_TAG_SIZE) == 1) { // next block is an INUSE
+				current_block += SIZE(current_block) + BLOCK_TAG_SIZE + BLOCK_TAG_SIZE + INUSE_BLOCK_HEADER_SIZE;
+			}
+			else {//next block is a free
+				current_block += SIZE(current_block) + BLOCK_TAG_SIZE + BLOCK_TAG_SIZE + FREE_BLOCK_HEADER_SIZE;
+			}
+		}
+
+	}
 }

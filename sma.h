@@ -58,3 +58,4 @@ static int find_position_in_free_list(void* block);
 static void* get_free_block_top_heap();
 static void clean_memory();
 static void* find_next_free_block(void* block);
+static void update_stats();
