@@ -1,5 +1,5 @@
 For the grader: 
-For the NEXT-FIT allocation, I assume that changing the memory allocation policy resets the last allocated memory to the start of the heap. This is because in the test file, before test 4, the last allocated memory was cp2 at c2[27] so the next-fit algorithm should have allocated at c2[29] where there were 3*16kB free, yet test4 expects cp3 to be allocated at c2[8]. Not resetting the last allocated memory after the policy has been changed could lead to having the last allocated memory pointer in the middle of some other allocated block's memory.
+For the NEXT-FIT allocation, I assume that changing the memory allocation policy resets the last allocated memory to the start of the heap. This is because in the test file, before test 4, the last allocated memory was cp2 at c2[27] so the next-fit algorithm should have allocated at c2[29] where there were 3*16kB free, yet test4 expects cp3 to be allocated at c2[8]. Not resetting the last allocated memory after the policy has been changed could lead to having the last allocated memory pointer in the middle of some other allocated block's memory. So if the last allocated memory is free, the next-fit also resets.
 Regarding the runtime errors of misaligned memory accessing; Professor Maheswaran confirmed with me by email that it should not be penalized.
 
 
