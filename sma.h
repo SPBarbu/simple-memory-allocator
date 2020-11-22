@@ -36,7 +36,6 @@ void sma_free(void* ptr);
 void sma_mallopt(int policy);
 void sma_mallinfo();
 void* sma_realloc(void* ptr, int size);
-void test();
 
 //  Private Functions declaration
 static void* allocate_pBrk(int size);
@@ -48,7 +47,7 @@ static void replace_block_freeList(void* oldBlock, void* newBlock, int size);
 static void add_block_freeList(void* block, int size);
 static void remove_block_freeList(void* block);
 static int get_blockSize(void* ptr);
-int get_largest_freeBlock();
+static int get_largest_freeBlock();
 static void write_block(void* block, int type, void* previous, void* next, int size);
 static void hex_dump(void* addr, int len);
 static void print_block(void* block);
@@ -56,6 +55,6 @@ static void merge(void* bottom_block, void* top_block);
 static void print_heap();
 static int find_position_in_free_list(void* block);
 static void* get_free_block_top_heap();
-static void clean_memory();
+static int clean_memory();
 static void* find_next_free_block(void* block);
 static void update_stats();

@@ -33,28 +33,22 @@ int main(int argc, char* argv[]) {
 	int* c2[32];
 	char str[60];
 
-	int a;
 	// Test 1: Find the holes
 	puts("Test 1: Excess Memory Allocation...");
 
 	// Allocating 32 kbytes of memory..
 	for (i = 0; i < 32; i++) {
 		c[i] = (char*)sma_malloc(1024);
-		a = get_largest_freeBlock();
 		// sprintf(str, "c[i]: %p", c[i]);
 		// puts(str);
 	}
 	// Now deallocating some of the slots ..to free
 	for (i = 10; i < 18; i++) {
-		if (i == 17) {
-			puts("");
-		}
 		sma_free(c[i]);
-		a = get_largest_freeBlock();
 		// sprintf(str, "Freeing c[i]: %p", c[i]);
 		// puts(str);
 	}
-	test();
+	
 	// Allocate some storage .. this should go into the freed storage
 	ct = (char*)sma_malloc(5 * 1024);
 	// sprintf(str, "CT : %p", ct);
@@ -93,22 +87,15 @@ int main(int argc, char* argv[]) {
 	// Allocating 512 kbytes of memory..
 	for (i = 0; i < 32; i++) {
 		c2[i] = (int*)sma_malloc(16 * 1024);
-		a = get_largest_freeBlock();
 	}
 
-	a = get_largest_freeBlock();
 	// Now deallocating some of the slots ..to free
 	// One chunk of 5x16 kbytes
 	sma_free(c2[31]);
-	a = get_largest_freeBlock();
 	sma_free(c2[30]);
-	a = get_largest_freeBlock();
 	sma_free(c2[29]);
-	a = get_largest_freeBlock();
 	sma_free(c2[28]);
-	a = get_largest_freeBlock();
 	sma_free(c2[27]);
-	a = get_largest_freeBlock();
 
 	// One chunk of 3x16 kbytes
 	sma_free(c2[25]);

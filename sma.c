@@ -64,111 +64,13 @@ int requesting = 0;//indicator for memory cleaning when pbrk expending
  * =====================================================================================
  */
 
-void test() {
-
-	sma_malloc(1);
-	sma_mallinfo();
-	sma_malloc(1);
-	sma_mallinfo();
-	void* a = sma_malloc(1);
-	sma_mallinfo();
-	sma_free(a);
-	sma_mallinfo();
-
-
-	//test NEXT-FIT
-	// heap_start = sbrk(256);
-	// void* INUSE = heap_start + 5;
-	// write_block(INUSE, 1, 0, 0, 17);
-	// void* FREE = INUSE + 17 + 1 + 21;
-	// add_block_freeList(FREE, 1);
-	// INUSE = FREE + 1 + 1 + 1 + 4;
-	// write_block(INUSE, 1, 0, 0, 17);
-	// FREE = INUSE + 17 + 1 + 21;
-	// add_block_freeList(FREE, 2);
-	// INUSE = FREE + 2 + 1 + 1 + 4;
-	// write_block(INUSE, 1, 0, 0, 17);
-	// FREE = INUSE + 17 + 1 + 21;
-	// add_block_freeList(FREE, 1);
-	// print_heap();
-
-	// sma_mallopt(2);
-	// sma_malloc(2);
-	// print_heap();
-	// sma_malloc(1);
-	// print_heap();
-
-
-	// // test get_size_free_top
-	// heap_start = sbrk(71);
-	// void* heap_end = sbrk(0);
-	// void* b1 = heap_start + 21;
-	// add_block_freeList(b1, 1);
-	// b1 += 24;
-	// add_block_freeList(b1, 1);
-	// b1 += 24;
-	// add_block_freeList(b1, 1);
-	// // int a = get_size_free_block_top_heap();
-	// print_heap();
-	// allocate_pBrk(1);
-
-	// //test worst fit
-	// sma_malloc(1);
-	// print_heap();
-	// sma_malloc(1);
-	// print_heap();
-	// sma_malloc(1);
-	// print_heap();
-	// sma_malloc(12);
-	// print_heap();
-	// sma_malloc(12);
-	// print_heap();
-
-	// //test worst fit
-	// heap_start = sbrk(0);
-	// void* b0 = sbrk(128) + 21;
-	// add_block_freeList(b0, 128 - FREE_OVERHEAD);
-	// void* b1 = allocate_worst_fit(1);
-
-
-	// //test clean memory
-	// void* block1 = sbrk(128) + 21;
-	// add_block_freeList(block1, 128 - FREE_OVERHEAD);
-	// sbrk(128);
-	// void* block2 = block1 + SIZE(block1) + BLOCK_TAG_SIZE + BLOCK_TAG_SIZE + FREE_BLOCK_HEADER_SIZE;
-	// add_block_freeList(block2, 128 - FREE_OVERHEAD);
-	// sbrk(128);
-	// block2 = block1 + SIZE(block1) + BLOCK_TAG_SIZE + BLOCK_TAG_SIZE + FREE_BLOCK_HEADER_SIZE;
-	// add_block_freeList(block2, 128 - FREE_OVERHEAD);
-	// sbrk(128);
-	// block2 = block1 + SIZE(block1) + BLOCK_TAG_SIZE + BLOCK_TAG_SIZE + FREE_BLOCK_HEADER_SIZE;
-	// add_block_freeList(block2, 128 - FREE_OVERHEAD);
-	// sbrk(128);
-	// block2 = block1 + SIZE(block1) + BLOCK_TAG_SIZE + BLOCK_TAG_SIZE + FREE_BLOCK_HEADER_SIZE;
-	// add_block_freeList(block2, 128 - FREE_OVERHEAD);
-	// sbrk(128);
-	// block2 = block1 + SIZE(block1) + BLOCK_TAG_SIZE + BLOCK_TAG_SIZE + FREE_BLOCK_HEADER_SIZE;
-	// add_block_freeList(block2, 128 - FREE_OVERHEAD);
-
-
-
-	// test add block free list
-	// void* block = sbrk(1024) + 21;
-	// add_block_freeList(block, 1);
-	// block += 23;
-	// block += 23;
-	// add_block_freeList(block, 1);
-	// block -= 23;
-	// add_block_freeList(block, 1);
-}
-
-/*
- *	Funcation Name: sma_malloc
- *	Input type:		int
- * 	Output type:	void*
- * 	Description:	Allocates a memory block of input size from the heap, and returns a
- * 					pointer pointing to it. Returns NULL if failed and sets a global error.
- */
+ /*
+  *	Funcation Name: sma_malloc
+  *	Input type:		int
+  * 	Output type:	void*
+  * 	Description:	Allocates a memory block of input size from the heap, and returns a
+  * 					pointer pointing to it. Returns NULL if failed and sets a global error.
+  */
 void* sma_malloc(int size) {
 	void* pMemory = NULL;
 	// Checks if the free list is empty
@@ -247,17 +149,21 @@ void sma_mallopt(int policy) {
 void sma_mallinfo() {
 	//	Finds the largest Contiguous Free Space (should be the largest free block)
 	int largestFreeBlock = get_largest_freeBlock();
-	char str[80];
+	char str[100];
 
 	update_stats();
 
-	sprintf(str, "Total number of bytes allocated not including overhead: %lu", total_bytes_allocated_data);
+	sprintf(str, "Total number of bytes of data allocated not including overhead: %lu", total_bytes_allocated_data);
 	puts(str);
-	sprintf(str, "Total number of bytes allocated including overhead: %lu", total_bytes_allocated_data + total_bytes_allocated_overhead);
+	sprintf(str, "Total number of bytes of data allocated including overhead: %lu", total_bytes_allocated_data + total_bytes_allocated_overhead);
 	puts(str);
-	sprintf(str, "Total free space: %lu", total_bytes_free_includes_overhead);
+	sprintf(str, "Total number of bytes of free space: %lu", total_bytes_free_includes_overhead);
 	puts(str);
-	sprintf(str, "Size of largest contigious free space (in bytes): %d", largestFreeBlock);
+	sprintf(str, "Size of the largest contigious free space (in bytes): %d", largestFreeBlock);
+	puts(str);
+	sprintf(str, "Size of the block at the top of the heap, if any: %d", SIZE(get_free_block_top_heap()));
+	puts(str);
+	sprintf(str, "Number of free holes on the heap: %d", clean_memory());
 	puts(str);
 }
 
@@ -667,7 +573,12 @@ void add_block_freeList(void* block, int size) {
 
 }
 
-void clean_memory() {
+/**
+ * Reduces the size of the free block at the top of the heap if too large
+ * For debugging purposes and testing merging ajdacent free blocks, returns the number of free holes on the heap.
+ *
+ */
+int clean_memory() {
 	/* Clean memory if top is free and larger than MAX_TOP_FREE */
 	void* current_block = freeListHead;
 	int number_of_blocks = 0;//just for debugging purposes
@@ -689,6 +600,7 @@ void clean_memory() {
 			number_of_blocks++;
 		}
 	}
+	return number_of_blocks;
 }
 
 /*
@@ -774,7 +686,7 @@ void write_block(void* block, int type, void* previous, void* next, int size) {
 		*(char*)(block - INUSE_BLOCK_HEADER_SIZE - BLOCK_TAG_SIZE) = 1;//head tag
 		*(int*)(block - sizeof(int)) = size;//size register
 		*(char*)(block + size) = 1;//foot tag
-		memset(block, 0, SIZE(block));
+		// memset(block, 0, SIZE(block));
 		print_block(block);
 	}
 	else if (type == 0) {//FREE block
@@ -783,7 +695,7 @@ void write_block(void* block, int type, void* previous, void* next, int size) {
 		*(void**)(block - sizeof(int) - sizeof(void*)) = next;//next register//TOTEST
 		*(void**)(block - sizeof(int) - sizeof(void*) - sizeof(void*)) = previous;//previous register//TOTEST
 		*(char*)(block + size) = 2;//foot tag
-		memset(block, 0, SIZE(block));
+		// memset(block, 0, SIZE(block));
 		print_block(block);
 	}
 
@@ -795,7 +707,7 @@ void print_heap() {
 }
 
 void print_block(void* block) {
-	// return;
+	return;
 
 	if (TYPE(block) == 1) {//INUSE block
 		if (SIZE(block) < 256) {
@@ -839,6 +751,7 @@ int find_position_in_free_list(void* block) {
 }
 
 /**
+ * Dumps memory, for debugging purposes
  * Modified from https://gist.github.com/domnikl/af00cc154e3da1c5d965
  */
 void hex_dump(void* addr, int len) {
